@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .post-card {
+    @apply relative transition-all duration-300 border-2 border-transparent rounded-lg overflow-hidden;
+  }
+  
+  .post-card.selected {
+    @apply border-purple-600;
+  }
+  
+  .animate-spin-slow {
+    animation: spin 4s linear infinite;
+  }
+
+  .check-overlay {
+    @apply hidden absolute inset-0 bg-black bg-opacity-50 items-center justify-center;
+  }
+
+  .post-card:hover .check-overlay {
+    @apply flex opacity-30;
+  }
+
+  .post-card.selected .check-overlay {
+    @apply flex opacity-70;
+  }
+
+  .payment-method-button {
+    @apply flex-1 flex items-center justify-center gap-2 p-4 cursor-pointer bg-white hover:bg-gray-50 transition-all duration-200 border-2 border-gray-300 rounded-lg;
+  }
+
+  .payment-method-button.selected {
+    @apply border-purple-600 bg-purple-50;
+  }
+}

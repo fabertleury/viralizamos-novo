@@ -1,0 +1,27 @@
+.profile-analyzer {
+  min-height: 100vh;
+}
+
+.profile-analyzer .container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+/* Estilos para os cards de análise */
+.profile-analyzer .card {
+  background: white;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Gradiente para títulos */
+.profile-analyzer .gradient-text {
+  background: linear-gradient(90deg, #405DE6 0%, #5B51D8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: bold;
+}

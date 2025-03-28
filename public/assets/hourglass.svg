@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Moldura externa -->
+  <path d="M14 4C14 2.89543 14.8954 2 16 2H32C33.1046 2 34 2.89543 34 4V14.5858C34 15.1162 33.7893 15.6249 33.4142 16L24 25.4142L14.5858 16C14.2107 15.6249 14 15.1162 14 14.5858V4Z" fill="white" fill-opacity="0.9"/>
+  <path d="M14 44C14 45.1046 14.8954 46 16 46H32C33.1046 46 34 45.1046 34 44V33.4142C34 32.8838 33.7893 32.3751 33.4142 32L24 22.5858L14.5858 32C14.2107 32.3751 14 32.8838 14 33.4142V44Z" fill="white" fill-opacity="0.6"/>
+  
+  <!-- Areia caindo -->
+  <path className="sand-stream" d="M24 25L24 32" stroke="white" strokeWidth="2" strokeLinecap="round">
+    <animate attributeName="strokeDasharray" values="0 8;8 0" dur="2s" repeatCount="indefinite"/>
+    <animate attributeName="strokeDashoffset" values="8;-8" dur="2s" repeatCount="indefinite"/>
+  </path>
+  
+  <!-- Partículas de areia -->
+  <circle className="sand-particle" cx="24" cy="28" r="1" fill="white">
+    <animate attributeName="cy" values="28;32" dur="1s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="1;0" dur="1s" repeatCount="indefinite"/>
+  </circle>
+  <circle className="sand-particle" cx="24" cy="26" r="1" fill="white">
+    <animate attributeName="cy" values="26;30" dur="1s" begin="0.3s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="1;0" dur="1s" begin="0.3s" repeatCount="indefinite"/>
+  </circle>
+  <circle className="sand-particle" cx="24" cy="24" r="1" fill="white">
+    <animate attributeName="cy" values="24;28" dur="1s" begin="0.6s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="1;0" dur="1s" begin="0.6s" repeatCount="indefinite"/>
+  </circle>
+  
+  <!-- Borda -->
+  <path d="M16 2H32C33.1046 2 34 2.89543 34 4V14.5858C34 15.1162 33.7893 15.6249 33.4142 16L24 25.4142L14.5858 16C14.2107 15.6249 14 15.1162 14 14.5858V4C14 2.89543 14.8954 2 16 2Z" stroke="white" strokeWidth="2" fill="none"/>
+  <path d="M16 46H32C33.1046 46 34 45.1046 34 44V33.4142C34 32.8838 33.7893 32.3751 33.4142 32L24 22.5858L14.5858 32C14.2107 32.3751 14 32.8838 14 33.4142V44C14 45.1046 14.8954 46 16 46Z" stroke="white" strokeWidth="2" fill="none"/>
+</svg>

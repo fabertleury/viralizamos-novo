@@ -1,0 +1,770 @@
+import { createClient } from '@/lib/supabase/server';
+import { processTransaction } from '@/lib/transactions/transactionProcessor';
+import mercadopago from 'mercadopago';
+
+// Configuração do Mercado Pago
+mercadopago.configurations.setAccessToken(process.env.MERCADO_PAGO_ACCESS_TOKEN || '');
+
+// Cache para evitar consultas repetidas
+const statusCache: Record<string, { status: string, timestamp: number }> = {};
+const CACHE_TTL = 5000; // 5 segundos
+
+// Cache para controlar tentativas de verificação
+const paymentAttempts: Record<string, number> = {};
+const MAX_ATTEMPTS = 60; // 30 minutos (verificando a cada 30 segundos)
+
+export class BackgroundPaymentChecker {
+  private static instance: BackgroundPaymentChecker;
+  private checkInterval: NodeJS.Timeout | null = null;
+  private isRunning: boolean = false;
+  private activePaymentIds: Set<string> = new Set();
+  private static isInitialized = false;
+
+  private constructor() {}
+
+  public static getInstance(): BackgroundPaymentChecker {
+    if (!BackgroundPaymentChecker.instance) {
+      console.log('Criando nova instância do BackgroundPaymentChecker');
+      BackgroundPaymentChecker.instance = new BackgroundPaymentChecker();
+    } else if (BackgroundPaymentChecker.isInitialized) {
+      console.log('Reusando instância existente do BackgroundPaymentChecker');
+    }
+    return BackgroundPaymentChecker.instance;
+  }
+
+  public async startChecking(forceCheck = false) {
+    // Verificar se já está inicializado
+    if (BackgroundPaymentChecker.isInitialized && !forceCheck) {
+      console.log('BackgroundPaymentChecker já foi inicializado anteriormente, ignorando solicitação duplicada');
+      return { status: 'already_initialized', checked: false };
+    }
+    
+    // Verificar se já está em execução
+    if (this.isRunning && !forceCheck) {
+      console.log('BackgroundPaymentChecker já está em execução, pulando inicialização');
+      return { status: 'already_running', checked: false };
+    }
+    
+    console.log('Iniciando BackgroundPaymentChecker...');
+    this.isRunning = true;
+    BackgroundPaymentChecker.isInitialized = true;
+
+    // Verificar a cada 20 segundos
+    if (!this.checkInterval) {
+      this.checkInterval = setInterval(async () => {
+        try {
+          await this.checkPendingPayments();
+        } catch (error) {
+          console.error('Erro durante verificação programada de pagamentos:', error);
+        }
+      }, 20000);
+    }
+
+    // Verificar imediatamente ao iniciar ou se for forçado
+    try {
+      console.log(`Realizando verificação inicial${forceCheck ? ' (forçada)' : ''}...`);
+      const result = await this.checkPendingPayments();
+      return { status: 'success', checked: true, result };
+    } catch (error) {
+      console.error('Erro ao verificar pagamentos durante inicialização:', error);
+      return { status: 'error', checked: false, error: String(error) };
+    }
+  }
+
+  public stopChecking() {
+    if (this.checkInterval) {
+      console.log('Parando BackgroundPaymentChecker...');
+      clearInterval(this.checkInterval);
+      this.checkInterval = null;
+    }
+    this.isRunning = false;
+  }
+
+  private async checkPendingPayments() {
+    try {
+      console.log('Verificando pagamentos pendentes...');
+      
+      // Inicialização do cliente Supabase
+      const supabase = createClient();
+      
+      // Array para rastrear transações já processadas nesta execução
+      const processedTransactions = new Set();
+      
+      // Buscar transações com pagamento pendente na nova tabela core_transactions_v2
+      const { data: transactions, error } = await supabase
+        .from('core_transactions_v2')
+        .select('*')
+        .is('order_created', false) // Transações sem pedidos criados
+        .limit(10);
+      
+      if (error) {
+        console.error('Erro ao buscar transações pendentes:', error.message);
+        
+        // Tentar buscar na tabela antiga como fallback
+        console.log('Tentando buscar transações na tabela antiga como fallback...');
+        const { data: oldTransactions, error: oldError } = await supabase
+          .from('core_transactions')
+          .select('*')
+          .is('order_created', false)
+          .limit(10);
+          
+        if (oldError) {
+          console.error('Erro ao buscar transações antigas pendentes:', oldError.message);
+          return { status: 'error', error: oldError.message };
+        }
+        
+        if (oldTransactions && oldTransactions.length > 0) {
+          console.log(`Encontradas ${oldTransactions.length} transações pendentes na tabela antiga`);
+          
+          // Processar transações da tabela antiga
+          for (const transaction of oldTransactions) {
+            // Verificar se já processamos esta transação nesta execução
+            if (processedTransactions.has(transaction.id)) {
+              console.log(`Transação ${transaction.id} já foi processada nesta execução, pulando.`);
+              continue;
+            }
+            
+            // Verificar se é transação já aprovada para evitar verificação repetida
+            if (transaction.status === 'approved') {
+              // Verificar se já tem tentativas registradas
+              const attemptCount = paymentAttempts[transaction.id] || 0;
+              if (attemptCount > 3) {
+                console.log(`Transação ${transaction.id} já foi verificada ${attemptCount} vezes e está aprovada. Registrando log e pulando.`);
+                
+                // Registrar um log indicando que a transação está aprovada mas não foi processada
+                await supabase.from('core_processing_logs').insert({
+                  transaction_id: transaction.id,
+                  level: 'warning',
+                  message: 'Transação aprovada mas sem pedido criado após múltiplas verificações',
+                  metadata: {
+                    payment_id: transaction.payment_id,
+                    attempt_count: attemptCount,
+                    timestamp: new Date().toISOString()
+                  }
+                });
+                
+                continue;
+              }
+            }
+            
+            // Incrementar contagem de tentativas
+            paymentAttempts[transaction.id] = (paymentAttempts[transaction.id] || 0) + 1;
+            
+            // Adicionar à lista de processados nesta execução
+            processedTransactions.add(transaction.id);
+            
+            // Processar a transação
+            await this.checkPayment(transaction);
+          }
+          
+          return { status: 'success', processed: oldTransactions.length };
+        }
+        
+        return { status: 'error', error: error.message };
+      }
+      
+      console.log(`Encontradas ${transactions?.length || 0} transações pendentes`);
+      
+      // Processar cada transação
+      for (const transaction of transactions || []) {
+        try {
+          // Verificar se já processamos esta transação nesta execução
+          if (processedTransactions.has(transaction.id)) {
+            console.log(`Transação ${transaction.id} já foi processada nesta execução, pulando.`);
+            continue;
+          }
+          
+          // Verificar se é transação já aprovada para evitar verificação repetida
+          if (transaction.status === 'approved') {
+            // Verificar se já tem tentativas registradas
+            const attemptCount = paymentAttempts[transaction.id] || 0;
+            if (attemptCount > 3) {
+              console.log(`Transação ${transaction.id} já foi verificada ${attemptCount} vezes e está aprovada. Registrando log e pulando.`);
+              
+              // Registrar um log indicando que a transação está aprovada mas não foi processada
+              await supabase.from('core_processing_logs').insert({
+                transaction_id: transaction.id,
+                level: 'warning',
+                message: 'Transação aprovada mas sem pedido criado após múltiplas verificações',
+                metadata: {
+                  payment_id: transaction.payment_id,
+                  attempt_count: attemptCount,
+                  timestamp: new Date().toISOString()
+                }
+              });
+              
+              continue;
+            }
+          }
+          
+          // Incrementar contagem de tentativas
+          paymentAttempts[transaction.id] = (paymentAttempts[transaction.id] || 0) + 1;
+          
+          // Adicionar à lista de processados nesta execução
+          processedTransactions.add(transaction.id);
+          
+          // Processar a transação
+          await this.checkPayment(transaction);
+        } catch (transactionError) {
+          console.error(`Erro ao processar transação:`, transactionError);
+        }
+      }
+      
+      return { status: 'success', processed: transactions?.length || 0 };
+    } catch (error) {
+      console.error('Erro ao verificar pagamentos pendentes:', error);
+      return { status: 'error', error: String(error) };
+    }
+  }
+
+  public async checkPaymentStatus(paymentId: string) {
+    try {
+      console.log(`Verificando status do pagamento ${paymentId}...`);
+      const supabase = createClient();
+
+      // Buscar transação no Supabase na nova tabela core_transactions_v2
+      const { data: transaction, error } = await supabase
+        .from('core_transactions_v2')
+        .select('*')
+        .or(`payment_external_reference.eq."${paymentId}",payment_id.eq."${paymentId}"`)
+        .single();
+
+      if (error) {
+        console.error('Erro ao buscar transação:', error);
+        
+        // Verificar se a transação existe na tabela antiga
+        const { data: oldTransaction, error: oldError } = await supabase
+          .from('core_transactions')
+          .select('*')
+          .or(`payment_external_reference.eq."${paymentId}",payment_id.eq."${paymentId}"`)
+          .single();
+          
+        if (!oldError && oldTransaction) {
+          console.log(`Transação encontrada na tabela antiga para pagamento ${paymentId}`);
+          // Continuar com a transação antiga
+          const result = this.processPaymentStatus(paymentId, oldTransaction);
+          return result;
+        }
+        
+        console.log(`Transação não encontrada no Supabase, buscando no Mercado Pago`);
+        // Se a transação não foi encontrada em nenhuma tabela, verificar diretamente no Mercado Pago
+        return this.checkPaymentDirectly(paymentId);
+      }
+
+      if (!transaction) {
+        console.warn(`Transação não encontrada para pagamento ${paymentId}`);
+        return this.checkPaymentDirectly(paymentId);
+      }
+
+      return this.processPaymentStatus(paymentId, transaction);
+    } catch (error) {
+      console.error(`Erro ao verificar status do pagamento ${paymentId}:`, error);
+      return {
+        status: 'error',
+        error: String(error)
+      };
+    }
+  }
+  
+  private async processPaymentStatus(paymentId: string, transaction: any) {
+    // Verificar cache para evitar consultas desnecessárias
+    const now = Date.now();
+    const cachedData = statusCache[paymentId];
+    if (cachedData && (now - cachedData.timestamp < CACHE_TTL)) {
+      console.log(`Usando cache para payment_id ${paymentId}, status: ${cachedData.status}`);
+      
+      // Verificar se o pagamento está aprovado mas o pedido não foi criado
+      if (cachedData.status === 'approved' && (!transaction.order_created || transaction.order_created === false)) {
+        // Verificar tentativas para evitar loops infinitos
+        const attemptCount = paymentAttempts[transaction.id] || 0;
+        
+        if (attemptCount > 3) {
+          console.log(`Transação ${transaction.id} já foi verificada ${attemptCount} vezes e está aprovada. Pulando processamento repetido.`);
+          
+          // Registrar log para análise futura
+          await createClient().from('core_processing_logs').insert({
+            transaction_id: transaction.id,
+            level: 'warning',
+            message: 'Transação aprovada mas sem pedido criado após múltiplas verificações',
+            metadata: {
+              payment_id: paymentId,
+              attempt_count: attemptCount,
+              timestamp: new Date().toISOString()
+            }
+          });
+        } else {
+          console.log(`Pagamento ${paymentId} está aprovado mas sem pedido. Processando... (tentativa ${attemptCount + 1})`);
+          try {
+            // Registrar tentativa
+            paymentAttempts[transaction.id] = attemptCount + 1;
+            
+            // Processar transação
+            await this.checkPayment(transaction);
+            console.log(`Pedido processado com sucesso para transação ${transaction.id}`);
+          } catch (processError) {
+            console.error(`Erro ao processar transação ${transaction.id}:`, processError);
+          }
+        }
+      }
+      
+      return {
+        status: cachedData.status,
+        transaction_id: transaction.id,
+        transaction: transaction,
+        source: 'cache'
+      };
+    }
+
+    // Buscar status no Mercado Pago
+    console.log(`Consultando Mercado Pago para pagamento ${paymentId}...`);
+    const paymentResponse = await mercadopago.payment.get(String(paymentId));
+    const paymentData = paymentResponse.body;
+    const currentStatus = paymentData.status;
+    
+    console.log(`Status atual do pagamento ${paymentId}: ${currentStatus}`);
+
+    // Atualizar cache
+    statusCache[paymentId] = {
+      status: currentStatus,
+      timestamp: now
+    };
+
+    // Mapear status do Mercado Pago para status da transação
+    let transactionStatus;
+    switch (currentStatus) {
+      case 'approved':
+        transactionStatus = 'approved';
+        break;
+      case 'pending':
+        transactionStatus = 'pending';
+        break;
+      case 'in_process':
+        transactionStatus = 'processing';
+        break;
+      case 'rejected':
+        transactionStatus = 'rejected';
+        break;
+      case 'cancelled':
+        transactionStatus = 'cancelled';
+        break;
+      case 'refunded':
+        transactionStatus = 'refunded';
+        break;
+      case 'charged_back':
+        transactionStatus = 'chargeback';
+        break;
+      default:
+        transactionStatus = 'pending';
+    }
+
+    // Verificar se o status mudou
+    if (transaction.status !== transactionStatus) {
+      console.log(`Status do pagamento ${paymentId} mudou: ${transaction.status} -> ${transactionStatus}`);
+      
+      // Identificar qual tabela atualizar baseado no ID da transação
+      const tableName = transaction.hasOwnProperty('action_type') ? 'core_transactions_v2' : 'core_transactions';
+      
+      // Atualizar a transação
+      const { error: updateError } = await createClient()
+        .from(tableName)
+        .update({
+          status: transactionStatus,
+          payment_status: currentStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', transaction.id);
+      
+      if (updateError) {
+        console.error(`Erro ao atualizar transação ${transaction.id}:`, updateError);
+      } else {
+        console.log(`Transação ${transaction.id} atualizada para status '${transactionStatus}'`);
+        
+        // Registrar log da atualização
+        try {
+          await createClient().from('core_processing_logs').insert({
+            transaction_id: transaction.id,
+            level: 'info',
+            message: `Status do pagamento atualizado: ${currentStatus}`,
+            metadata: {
+              payment_id: paymentId,
+              previous_status: transaction.status,
+              new_status: transactionStatus
+            }
+          });
+        } catch (logError) {
+          console.error('Erro ao registrar log de atualização:', logError);
+        }
+        
+        // Processar a transação se foi aprovada
+        if (transactionStatus === 'approved' && (!transaction.order_created || transaction.order_created === false)) {
+          // Verificar tentativas para evitar loops infinitos
+          const attemptCount = paymentAttempts[transaction.id] || 0;
+          
+          if (attemptCount > 3) {
+            console.log(`Transação ${transaction.id} já foi verificada ${attemptCount} vezes. Pulando processamento repetido.`);
+            
+            // Registrar log para análise futura
+            await createClient().from('core_processing_logs').insert({
+              transaction_id: transaction.id,
+              level: 'warning',
+              message: 'Transação aprovada mas sem pedido criado após múltiplas verificações',
+              metadata: {
+                payment_id: paymentId,
+                attempt_count: attemptCount,
+                timestamp: new Date().toISOString()
+              }
+            });
+          } else {
+            console.log(`Transação ${transaction.id} aprovada e sem pedido. Processando... (tentativa ${attemptCount + 1})`);
+            
+            // Registrar tentativa
+            paymentAttempts[transaction.id] = attemptCount + 1;
+            
+            try {
+              await this.checkPayment(transaction);
+            } catch (processError) {
+              console.error(`Erro ao processar transação aprovada ${transaction.id}:`, processError);
+              
+              // Registrar erro
+              await createClient().from('core_processing_logs').insert({
+                transaction_id: transaction.id,
+                level: 'error',
+                message: 'Erro ao processar transação aprovada',
+                metadata: {
+                  payment_id: paymentId,
+                  error: processError instanceof Error ? processError.message : String(processError),
+                  timestamp: new Date().toISOString(),
+                  attempt: attemptCount + 1
+                }
+              });
+            }
+          }
+        }
+      }
+    } else {
+      console.log(`Status do pagamento ${paymentId} não mudou: ${transaction.status}`);
+    }
+
+    return {
+      status: currentStatus,
+      statusDetail: paymentData.status_detail,
+      payment: paymentData,
+      transaction_id: transaction.id,
+      source: 'mercadopago'
+    };
+  }
+  
+  private async checkPaymentDirectly(paymentId: string) {
+    try {
+      console.log(`Status do pagamento (Mercado Pago direto): ${paymentId}`);
+      const paymentResponse = await mercadopago.payment.get(String(paymentId));
+      const paymentData = paymentResponse.body;
+      const currentStatus = paymentData.status;
+      
+      console.log(`Status do pagamento (Mercado Pago direto): ${currentStatus}`);
+      
+      // Atualizar cache
+      statusCache[paymentId] = {
+        status: currentStatus,
+        timestamp: Date.now()
+      };
+      
+      return {
+        status: currentStatus,
+        statusDetail: paymentData.status_detail,
+        payment: paymentData,
+        source: 'mercadopago_direct'
+      };
+    } catch (error) {
+      console.error(`Erro ao verificar pagamento diretamente no Mercado Pago:`, error);
+      return {
+        status: 'error',
+        error: String(error),
+        source: 'error_mercadopago_direct'
+      };
+    }
+  }
+
+  public async checkExpiringTransactions() {
+    try {
+      console.log('Verificando transações prestes a expirar...');
+      const supabase = createClient();
+
+      // Calcular intervalo para transações que estão quase expirando (30 minutos após criação)
+      const expirationTime = new Date();
+      expirationTime.setMinutes(expirationTime.getMinutes() - 30); // 30 minutos atrás
+      const expirationTimeStr = expirationTime.toISOString();
+
+      // Dar uma margem de 5 minutos para capturar transações entre 25-30 minutos
+      const marginTime = new Date();
+      marginTime.setMinutes(marginTime.getMinutes() - 25); // 25 minutos atrás
+      const marginTimeStr = marginTime.toISOString();
+
+      // Buscar transações pendentes que estão no período de quase expiração
+      const { data: expiringTransactions, error } = await supabase
+        .from('core_transactions_v2')
+        .select('*')
+        .eq('status', 'pending')
+        .is('order_created', false)
+        .lt('created_at', marginTimeStr)
+        .gt('created_at', expirationTimeStr)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Erro ao buscar transações quase expirando:', error);
+        return { error: 'fetch_error', message: error.message };
+      }
+
+      if (!expiringTransactions || expiringTransactions.length === 0) {
+        console.log('Nenhuma transação quase expirando encontrada');
+        return { status: 'no_expiring_transactions' };
+      }
+
+      console.log(`Verificando ${expiringTransactions.length} transações prestes a expirar`);
+      const results = [];
+
+      for (const transaction of expiringTransactions) {
+        console.log(`Verificando transação quase expirando ${transaction.id}`);
+        
+        try {
+          const result = await this.checkPayment(transaction);
+          results.push(result);
+        } catch (error: any) {
+          console.error(`Erro ao verificar transação quase expirando ${transaction.id}:`, error);
+          results.push({
+            transaction_id: transaction.id,
+            status: 'error',
+            message: error.message || 'Erro desconhecido'
+          });
+        }
+      }
+
+      return { status: 'success', results };
+    } catch (error: any) {
+      console.error('Erro ao verificar transações quase expirando:', error);
+      return { error: 'check_error', message: error.message || 'Erro desconhecido' };
+    }
+  }
+
+  public async checkPayment(transaction: Record<string, any>) {
+    try {
+      console.log(`Processando transação: ${transaction.id}`);
+      
+      // Verificar o payment_id da transação
+      const paymentId = transaction.payment_id;
+      if (!paymentId) {
+        console.log(`Transação ${transaction.id} não tem payment_id. Pulando.`);
+        return;
+      }
+      
+      // IMPORTANTE: Verificar status do pagamento no Mercado Pago
+      console.log(`Verificando status do pagamento ${paymentId}...`);
+      
+      try {
+        // Verificar o status atual do pagamento no Mercado Pago
+        const paymentStatusResult = await this.checkPaymentStatus(paymentId);
+        const paymentStatus = typeof paymentStatusResult === 'string' 
+          ? paymentStatusResult 
+          : paymentStatusResult.status;
+          
+        console.log(`Status atual do pagamento ${paymentId}: ${paymentStatus || 'desconhecido'}`);
+        
+        // Se o pagamento não está aprovado, não processar ainda
+        if (paymentStatus !== 'approved') {
+          console.log(`Pagamento ${paymentId} não está aprovado (status: ${paymentStatus}). Pulando processamento.`);
+          return;
+        }
+        
+        // Determinar a tabela correta com base na existência do campo action_type
+        const tableName = transaction.hasOwnProperty('action_type') ? 'core_transactions_v2' : 'core_transactions';
+        
+        // Se o status do pagamento é approved mas a transação não reflete isso, atualizar
+        if (paymentStatus === 'approved' && transaction.status !== 'approved') {
+          console.log(`Atualizando status da transação ${transaction.id} para 'approved'`);
+          const supabase = createClient();
+          
+          await supabase
+            .from(tableName)
+            .update({ 
+              status: 'approved', 
+              payment_status: 'approved',
+              updated_at: new Date().toISOString() 
+            })
+            .eq('id', transaction.id);
+        }
+        
+        // Somente processar a transação se o status for approved
+        if (paymentStatus === 'approved') {
+          // Marcar o pedido como criado se ainda não estiver
+          if (!transaction.order_created || transaction.order_created === false) {
+            console.log(`Marcando pedido como criado para transação ${transaction.id}`);
+            const supabase = createClient();
+            
+            try {
+              // Buscar informações detalhadas da transação
+              const { data: transactionDetails, error: detailError } = await supabase
+                .from('core_transactions_v2')
+                .select('*')
+                .eq('id', transaction.id)
+                .maybeSingle();
+
+              if (detailError || !transactionDetails) {
+                throw new Error(`Erro ao buscar detalhes da transação: ${detailError?.message || 'Transação não encontrada'}`);
+              }
+
+              // Buscar posts da transação
+              const { data: transactionPosts, error: postsError } = await supabase
+                .from('core_transaction_posts_v2')
+                .select('*')
+                .eq('transaction_id', transaction.id);
+
+              if (postsError) {
+                console.error(`Erro ao buscar posts da transação:`, postsError);
+              }
+
+              // Gerar ID do pedido
+              const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+              // Verificar se já existe um pedido para esta transação
+              const { data: existingOrder, error: checkOrderError } = await supabase
+                .from('core_orders')
+                .select('id')
+                .eq('transaction_id', transaction.id)
+                .maybeSingle();
+
+              if (checkOrderError) {
+                console.error(`Erro ao verificar pedido existente:`, checkOrderError);
+              }
+
+              if (existingOrder) {
+                console.log(`Pedido já existe para a transação ${transaction.id}, atualizando status`);
+                
+                // Atualizar pedido existente
+                await supabase
+                  .from('core_orders')
+                  .update({ 
+                    status: 'pending',
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('id', existingOrder.id);
+              } else {
+                console.log(`Criando novo pedido para transação ${transaction.id}`);
+                
+                // Criar dados do pedido
+                const orderData = {
+                  transaction_id: transaction.id,
+                  post_id: transactionDetails.post_id,
+                  user_id: transactionDetails.user_id,
+                  service_id: transactionDetails.service_id,
+                  provider_id: transactionDetails.provider_id,
+                  external_order_id: orderId,
+                  provider_order_id: orderId,
+                  order_id: `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                  status: 'pending',
+                  status_text: 'Aguardando processamento',
+                  amount: transactionDetails.amount,
+                  quantity: 1000,
+                  target_username: transactionDetails.target_username || '',
+                  target_url: transactionDetails.target_url || '',
+                  payment_method: 'pix',
+                  payment_id: paymentId,
+                  needs_admin_attention: false,
+                  error_message: null,
+                  customer_id: transactionDetails.customer_id,
+                  customer_name: transactionDetails.customer_name || '',
+                  customer_email: transactionDetails.customer_email || '',
+                  customer_phone: transactionDetails.customer_phone || '',
+                  posts_count: transactionPosts?.length || 0,
+                  metadata: {
+                    payment_id: paymentId,
+                    transaction_id: transaction.id,
+                    posts: transactionPosts || [],
+                    customer_metadata: transactionDetails.metadata || {},
+                    provider_request: null,
+                    provider_response: null,
+                    service_name: transactionDetails.service?.name,
+                    service_type: transactionDetails.service?.type,
+                    provider_name: transactionDetails.provider?.name
+                  }
+                };
+                
+                console.log(`Dados do pedido: ${JSON.stringify(orderData)}`);
+                
+                // Criar novo pedido em core_orders
+                const { error: orderError } = await supabase
+                  .from('core_orders')
+                  .insert(orderData);
+                
+                if (orderError) {
+                  console.error(`Erro ao criar pedido para transação ${transaction.id}:`, orderError);
+                  
+                  // Log da tentativa
+                  await supabase.from('core_processing_logs').insert({
+                    transaction_id: transaction.id,
+                    level: 'error',
+                    message: `Erro ao criar pedido: ${orderError.message || 'Erro desconhecido'}`,
+                    metadata: {
+                      payment_status: paymentStatus,
+                      transaction_id: transaction.id,
+                      order_data: orderData
+                    }
+                  });
+                } else {
+                  console.log(`Pedido criado com sucesso para transação ${transaction.id}`);
+                  
+                  // Log de sucesso
+                  await supabase.from('core_processing_logs').insert({
+                    transaction_id: transaction.id,
+                    level: 'info',
+                    message: 'Pagamento processado com sucesso',
+                    metadata: {
+                      payment_status: paymentStatus,
+                      transaction_id: transaction.id,
+                      order_id: orderId
+                    }
+                  });
+                }
+              }
+              
+              // Atualizar a transação para indicar que o pedido foi criado - usar sempre core_transactions_v2
+              await supabase
+                .from('core_transactions_v2')
+                .update({ 
+                  order_created: true,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', transaction.id);
+              
+              // Registrar log de criação de pedido
+              await supabase.from('core_processing_logs').insert({
+                transaction_id: transaction.id,
+                level: 'info',
+                message: `Pedido criado com sucesso para transação`,
+                metadata: {
+                  payment_id: paymentId,
+                  payment_status: paymentStatus,
+                  transaction_id: transaction.id,
+                  order_id: orderId
+                }
+              });
+              
+              console.log(`Transação ${transaction.id} foi marcada como processada.`);
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`Erro ao processar transação ${transaction.id}:`, error);
+      }
+    } catch (error) {
+      console.error(`Erro ao processar transação ${transaction.id}:`, error);
+    }
+  }
+
+  /**
+   * Método público para verificar transações próximas de expirar
+   * Este método pode ser chamado externamente para acionar a verificação
+   */
+  public async verifyExpiringTransactions() {
+    return this.checkExpiringTransactions();
+  }
+}

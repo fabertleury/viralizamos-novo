@@ -1,0 +1,7 @@
+{
+  "scripts": {
+    "check-orders": "ts-node -r tsconfig-paths/register src/scripts/check-orders-status.ts",
+    "run-jobs": "ts-node -r tsconfig-paths/register src/scripts/run-background-jobs.ts",
+    "check-config": "ts-node -r tsconfig-paths/register src/scripts/check-configuration.ts"
+  }
+} 

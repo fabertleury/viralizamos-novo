@@ -1,0 +1,40 @@
+[build]
+builder = "nixpacks"
+buildCommand = "npm run build"
+
+[deploy]
+startCommand = "npm start"
+healthcheckPath = "/"
+healthcheckTimeout = 100
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+runtime = "V2"
+numReplicas = 1
+sleepApplication = false
+
+[deploy.multiRegionConfig.us-west2]
+numReplicas = 1
+
+[variables]
+NEXT_PUBLIC_ENABLE_BACKGROUND_SERVICES = "true"
+
+# Configuração dos cron jobs
+[[cron]]
+schedule = "*/5 * * * *"
+command = "curl https://$RAILWAY_STATIC_URL/api/cron/check-payments?key=$CRON_SECRET_KEY"
+name = "check-payments"
+
+[[cron]]
+schedule = "*/30 * * * *"
+command = "curl https://$RAILWAY_STATIC_URL/api/cron/expired-transactions?key=$CRON_SECRET_KEY"
+name = "expire-transactions"
+
+[[cron]]
+schedule = "*/30 * * * *"
+command = "curl https://$RAILWAY_STATIC_URL/api/cron/init-services?key=$CRON_SECRET_KEY"
+name = "init-services"
+
+[[cron]]
+schedule = "*/15 * * * *"
+command = "curl https://$RAILWAY_STATIC_URL/api/cron/cleanup-locks?key=$CRON_SECRET_KEY"
+name = "cleanup-locks"

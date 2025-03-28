@@ -1,0 +1,74 @@
+{/* Miniaturas dos itens selecionados */}
+{selectedItemsCount > 0 && (
+  <div className="mt-3 pt-3 border-t">
+    <p className="text-sm font-medium mb-1">Itens selecionados:</p>
+    <div className="flex flex-wrap gap-0">
+      {selectedPosts.map((post) => (
+        <div key={`post-${post.id}`} className="relative w-12 h-12 rounded-sm overflow-hidden border border-pink-300 group m-0.5">
+          <img 
+            src={getProxiedImageUrl(post.image_url)} 
+            alt="Post selecionado" 
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              if (!target.src.includes('placeholder-post.svg')) {
+                target.src = '/images/placeholder-post.svg';
+              }
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+          <div className="absolute bottom-0 left-0 right-0 text-white text-[8px] bg-pink-500 text-center">
+            Post
+          </div>
+          {/* Botão X para remover */}
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              const updatedPosts = selectedPosts.filter(p => p.id !== post.id);
+              setSelectedPosts(updatedPosts);
+              handlePostSelect(updatedPosts);
+            }}
+            className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] 
+              shadow-md hover:bg-red-600"
+            aria-label="Remover post"
+          >
+            ×
+          </button>
+        </div>
+      ))}
+      {selectedReels.map((reel) => (
+        <div key={`reel-${reel.id}`} className="relative w-12 h-12 rounded-sm overflow-hidden border border-pink-300 group m-0.5">
+          <img 
+            src={getProxiedImageUrl(reel.image_url)} 
+            alt="Reel selecionado" 
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              if (!target.src.includes('placeholder-reel.svg')) {
+                target.src = '/images/placeholder-reel.svg';
+              }
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+          <div className="absolute bottom-0 left-0 right-0 text-white text-[8px] bg-purple-500 text-center">
+            Reel
+          </div>
+          {/* Botão X para remover */}
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              const updatedReels = selectedReels.filter(r => r.id !== reel.id);
+              setSelectedReels(updatedReels);
+              handleReelSelect(updatedReels);
+            }}
+            className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] 
+              shadow-md hover:bg-red-600"
+            aria-label="Remover reel"
+          >
+            ×
+          </button>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
