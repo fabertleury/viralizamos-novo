@@ -238,6 +238,9 @@ export class OrderProcessor {
           let targetUrl = post.url || order.target_url;
           const postCode = post.code || (order.metadata?.post_code);
           const isReel = post.type || (order.metadata?.post_type) === 'reel';
+          let postId = post.id;
+          let postQuantity = null;
+          let postCreated = false;
           
           if (!targetUrl) {
             // Construir URL baseada no tipo e código
@@ -246,33 +249,94 @@ export class OrderProcessor {
               : `https://instagram.com/p/${postCode}/`;
           }
           
-          // CORREÇÃO: Verificar se a URL é de perfil e não de post - isso indica um problema
+          // Verificar se a URL é de perfil e não de post
           if (targetUrl && targetUrl.includes('instagram.com/') && 
-              !targetUrl.includes('/p/') && !targetUrl.includes('/reel/') && 
-              order.metadata?.post_code) {
-            this.logger.warn(`URL de perfil detectada (${targetUrl}) mas temos post_code, corrigindo para URL de post...`);
+              !targetUrl.includes('/p/') && !targetUrl.includes('/reel/')) {
+            this.logger.warn(`URL de perfil detectada (${targetUrl}), buscando post_code na tabela de posts...`);
             
-            // Determinar se é um reel baseado no metadata
-            const isPostReel = order.metadata?.post_type === 'reel';
+            // Buscar posts da transação na tabela core_transaction_posts_v2
+            const { data: transactionPosts } = await this.supabase
+              .from('core_transaction_posts_v2')
+              .select('*')
+              .eq('transaction_id', order.transaction_id);
             
-            // Construir URL correta com o post_code
-            targetUrl = isPostReel
-              ? `https://instagram.com/reel/${order.metadata.post_code}/`
-              : `https://instagram.com/p/${order.metadata.post_code}/`;
+            if (transactionPosts && transactionPosts.length > 0) {
+              this.logger.info(`Encontrados ${transactionPosts.length} posts na tabela core_transaction_posts_v2`);
               
-            this.logger.info(`URL corrigida: ${targetUrl}`);
+              // Usar o primeiro post que tenha post_code
+              const postWithCode = transactionPosts.find(p => p.post_code);
+              
+              if (postWithCode) {
+                this.logger.info(`Encontrado post com código: ${postWithCode.post_code}, id: ${postWithCode.id}, quantidade: ${postWithCode.quantity || 'não definida'}`);
+                
+                // Salvar o ID e quantidade reais do post
+                postId = postWithCode.id;
+                postQuantity = postWithCode.quantity;
+                
+                // Determinar se é um reel baseado no tipo do post
+                const isPostReel = postWithCode.post_type === 'reel';
+                
+                // Construir URL correta com o post_code
+                targetUrl = isPostReel
+                  ? `https://instagram.com/reel/${postWithCode.post_code}/`
+                  : `https://instagram.com/p/${postWithCode.post_code}/`;
+                  
+                this.logger.info(`URL corrigida com dados da tabela: ${targetUrl}`);
+                
+                // Também atualizar o código do post com o valor da tabela
+                const postCodeFromTable = postWithCode.post_code;
+                
+                posts.push({
+                  id: postId,
+                  code: postCodeFromTable,
+                  url: targetUrl,
+                  type: postWithCode.post_type || post.type,
+                  username: post.username || order.target_username,
+                  quantity: postQuantity
+                });
+                
+                postCreated = true;
+              } else if (order.metadata?.post_code) {
+                // Caso não encontre na tabela mas tenha post_code no metadata
+                // Determinar se é um reel baseado no metadata
+                const isPostReel = order.metadata?.post_type === 'reel';
+                
+                // Construir URL correta com o post_code
+                targetUrl = isPostReel
+                  ? `https://instagram.com/reel/${order.metadata.post_code}/`
+                  : `https://instagram.com/p/${order.metadata.post_code}/`;
+                  
+                this.logger.info(`URL corrigida com metadata: ${targetUrl}`);
+              }
+            } else if (order.metadata?.post_code) {
+              // Caso não tenha posts na tabela mas tenha post_code no metadata
+              this.logger.warn(`Nenhum post encontrado na tabela, mas temos post_code no metadata, corrigindo...`);
+              
+              // Determinar se é um reel baseado no metadata
+              const isPostReel = order.metadata?.post_type === 'reel';
+              
+              // Construir URL correta com o post_code
+              targetUrl = isPostReel
+                ? `https://instagram.com/reel/${order.metadata.post_code}/`
+                : `https://instagram.com/p/${order.metadata.post_code}/`;
+              
+              this.logger.info(`URL corrigida: ${targetUrl}`);
+            }
           }
           
           // Garantir que a URL não tenha "www."
-          targetUrl = targetUrl.replace('www.', '');
+          targetUrl = targetUrl?.replace('www.', '');
           
-          posts.push({
-            id: post.id,
-            code: postCode,
-            url: targetUrl,
-            type: post.type || (order.metadata?.post_type),
-            username: post.username || order.target_username
-          });
+          // Só cria um post baseado na tabela 'posts' se não criou baseado em core_transaction_posts_v2
+          if (!postCreated) {
+            posts.push({
+              id: post.id,
+              code: postCode,
+              url: targetUrl,
+              type: post.type || (order.metadata?.post_type),
+              username: post.username || order.target_username
+            });
+          }
         }
       }
       
@@ -281,6 +345,9 @@ export class OrderProcessor {
         let targetUrl = order.target_url;
         const postCode = order.metadata?.post_code;
         const isReel = order.metadata?.post_type === 'reel';
+        let postId = null;
+        let postQuantity = null;
+        let postCreated = false;
         
         if (!targetUrl) {
           // Construir URL baseada no tipo e código
@@ -289,33 +356,94 @@ export class OrderProcessor {
             : `https://instagram.com/p/${postCode}/`;
         }
         
-        // CORREÇÃO: Verificar se a URL é de perfil e não de post - isso indica um problema
+        // Verificar se a URL é de perfil e não de post
         if (targetUrl && targetUrl.includes('instagram.com/') && 
-            !targetUrl.includes('/p/') && !targetUrl.includes('/reel/') && 
-            order.metadata?.post_code) {
-          this.logger.warn(`URL de perfil detectada (${targetUrl}) mas temos post_code, corrigindo para URL de post...`);
+            !targetUrl.includes('/p/') && !targetUrl.includes('/reel/')) {
+          this.logger.warn(`URL de perfil detectada (${targetUrl}), buscando post_code na tabela de posts...`);
           
-          // Determinar se é um reel baseado no metadata
-          const isPostReel = order.metadata?.post_type === 'reel';
+          // Buscar posts da transação na tabela core_transaction_posts_v2
+          const { data: transactionPosts } = await this.supabase
+            .from('core_transaction_posts_v2')
+            .select('*')
+            .eq('transaction_id', order.transaction_id);
           
-          // Construir URL correta com o post_code
-          targetUrl = isPostReel
-            ? `https://instagram.com/reel/${order.metadata.post_code}/`
-            : `https://instagram.com/p/${order.metadata.post_code}/`;
+          if (transactionPosts && transactionPosts.length > 0) {
+            this.logger.info(`Encontrados ${transactionPosts.length} posts na tabela core_transaction_posts_v2`);
             
-          this.logger.info(`URL corrigida: ${targetUrl}`);
+            // Usar o primeiro post que tenha post_code
+            const postWithCode = transactionPosts.find(p => p.post_code);
+            
+            if (postWithCode) {
+              this.logger.info(`Encontrado post com código: ${postWithCode.post_code}, id: ${postWithCode.id}, quantidade: ${postWithCode.quantity || 'não definida'}`);
+              
+              // Salvar o ID e quantidade reais do post
+              postId = postWithCode.id;
+              postQuantity = postWithCode.quantity;
+              
+              // Determinar se é um reel baseado no tipo do post
+              const isPostReel = postWithCode.post_type === 'reel';
+              
+              // Construir URL correta com o post_code
+              targetUrl = isPostReel
+                ? `https://instagram.com/reel/${postWithCode.post_code}/`
+                : `https://instagram.com/p/${postWithCode.post_code}/`;
+                
+              this.logger.info(`URL corrigida com dados da tabela: ${targetUrl}`);
+              
+              // Também atualizar o código do post com o valor da tabela
+              const postCodeFromTable = postWithCode.post_code;
+              
+              posts.push({
+                id: postId,
+                code: postCodeFromTable,
+                url: targetUrl,
+                type: postWithCode.post_type,
+                username: order.target_username,
+                quantity: postQuantity
+              });
+              
+              postCreated = true;
+            } else if (order.metadata?.post_code) {
+              // Caso não encontre na tabela mas tenha post_code no metadata
+              // Determinar se é um reel baseado no metadata
+              const isPostReel = order.metadata?.post_type === 'reel';
+              
+              // Construir URL correta com o post_code
+              targetUrl = isPostReel
+                ? `https://instagram.com/reel/${order.metadata.post_code}/`
+                : `https://instagram.com/p/${order.metadata.post_code}/`;
+                
+              this.logger.info(`URL corrigida com metadata: ${targetUrl}`);
+            }
+          } else if (order.metadata?.post_code) {
+            // Caso não tenha posts na tabela mas tenha post_code no metadata
+            this.logger.warn(`Nenhum post encontrado na tabela, mas temos post_code no metadata, corrigindo...`);
+            
+            // Determinar se é um reel baseado no metadata
+            const isPostReel = order.metadata?.post_type === 'reel';
+            
+            // Construir URL correta com o post_code
+            targetUrl = isPostReel
+              ? `https://instagram.com/reel/${order.metadata.post_code}/`
+              : `https://instagram.com/p/${order.metadata.post_code}/`;
+            
+            this.logger.info(`URL corrigida: ${targetUrl}`);
+          }
         }
         
         // Garantir que a URL não tenha "www."
-        targetUrl = targetUrl.replace('www.', '');
+        targetUrl = targetUrl?.replace('www.', '');
         
-        posts.push({
-          id: order.post_id || `virtual-${Date.now()}`,
-          url: targetUrl,
-          code: postCode,
-          type: order.metadata?.post_type,
-          username: order.target_username
-        });
+        // Só cria um post virtual se não conseguir obter os dados da tabela
+        if (!postCreated) {
+          posts.push({
+            id: order.post_id || `virtual-${Date.now()}`,
+            url: targetUrl,
+            code: postCode,
+            type: order.metadata?.post_type,
+            username: order.target_username
+          });
+        }
       }
       
       // Determinar o tipo de serviço

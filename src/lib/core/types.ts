@@ -9,6 +9,7 @@ export interface Post {
   caption?: string;
   type?: string;
   username?: string;
+  quantity?: number;
 }
 
 /**

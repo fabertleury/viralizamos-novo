@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { Transaction, Post, ProcessResult } from '../types';
+import { Post, ProcessResult } from '../types';
 import { LinkFormatter } from '../utils/linkFormatter';
 import { Logger } from '../utils/logger';
 import { ProviderOrderService } from '../services/providerOrderService';
@@ -96,7 +96,7 @@ export class TransactionProcessor {
       try {
         // Buscar a transação no banco de dados
         const { data: transaction, error } = await this.supabase
-          .from('core_transactions')
+          .from('core_transactions_v2')
           .select('*')
           .eq('id', transactionId)
           .single();
@@ -132,7 +132,7 @@ export class TransactionProcessor {
         
         // Buscar os posts associados à transação
         const { data: postsData } = await this.supabase
-          .from('core_transaction_posts')
+          .from('core_transaction_posts_v2')
           .select('*')
           .eq('transaction_id', transactionId)
           .order('created_at', { ascending: true });
@@ -148,7 +148,8 @@ export class TransactionProcessor {
             url: post.post_url,
             caption: post.post_caption,
             type: post.post_type,
-            username: post.username
+            username: post.username,
+            quantity: post.quantity
           }));
         } 
         // Caso contrário, verificar se há posts nos metadados da transação
@@ -164,11 +165,12 @@ export class TransactionProcessor {
               post_url: post.url || post.link || '',
               post_caption: post.caption || '',
               post_type: (post.url || post.link || '').includes('/reel/') ? 'reel' : 'post',
-              username: post.username || transaction.target_username
+              username: post.username || transaction.target_username,
+              quantity: post.quantity || null
             }));
             
-            const { data: insertedPosts, error: insertError } = await this.supabase
-              .from('core_transaction_posts')
+            const { data: insertedPosts } = await this.supabase
+              .from('core_transaction_posts_v2')
               .insert(postsToInsert)
               .select();
               
@@ -199,8 +201,8 @@ export class TransactionProcessor {
             .single();
             
           if (service && service.type.toLowerCase() === 'seguidores') {
-            const { data: insertedPost, error: insertError } = await this.supabase
-              .from('core_transaction_posts')
+            const { data: insertedPost } = await this.supabase
+              .from('core_transaction_posts_v2')
               .insert({
                 transaction_id: transactionId,
                 username: transaction.target_username,
@@ -209,7 +211,7 @@ export class TransactionProcessor {
               .select()
               .single();
               
-            if (insertedPost && !insertError) {
+            if (insertedPost) {
               posts = [{
                 id: insertedPost.id,
                 username: transaction.target_username,
@@ -303,7 +305,7 @@ export class TransactionProcessor {
           
           // Atualizar a transação com o erro
           await this.supabase
-            .from('core_transactions')
+            .from('core_transactions_v2')
             .update({
               processing_attempts: transaction.processing_attempts + 1,
               last_processing_error: orderResult.error,
@@ -328,7 +330,7 @@ export class TransactionProcessor {
         
         // Atualizar a transação como processada
         await this.supabase
-          .from('core_transactions')
+          .from('core_transactions_v2')
           .update({
             is_processed: true,
             processing_attempts: transaction.processing_attempts + 1,
@@ -371,7 +373,7 @@ export class TransactionProcessor {
       // Registrar erro
       try {
         await this.supabase
-          .from('core_transactions')
+          .from('core_transactions_v2')
           .update({
             processing_attempts: this.supabase.rpc('increment_attempts', { transaction_id: transactionId }),
             last_processing_error: error instanceof Error ? error.message : 'Erro desconhecido',

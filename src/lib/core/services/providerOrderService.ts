@@ -514,22 +514,35 @@ export class ProviderOrderService {
     
     // NOVA VERIFICAÇÃO: Se o URL é de perfil e não de post/reel e não temos código
     // (É um caso onde enviamos URL de perfil para um serviço de curtidas)
-    if (!post.code && post.url && post.url.includes('instagram.com/') && 
+    if (post.url && post.url.includes('instagram.com/') && 
         !post.url.includes('/p/') && !post.url.includes('/reel/')) {
       
       this.logger.warn(`⚠️ URL de perfil detectada para serviço de ${serviceType}: ${post.url}`);
       throw new Error(`Erro de validação: URLs de perfil não são válidas para serviço de ${serviceType}. É necessário fornecer URLs de posts/reels específicos.`);
     }
     
-    if (!post.code) {
-      throw new Error(`Post não possui código: ${JSON.stringify(post)}`);
+    // Extrair código do post da URL se não estiver definido explicitamente
+    let postCode = post.code;
+    if (!postCode && post.url) {
+      // Tenta extrair o código da URL
+      const match = post.url.match(/instagram\.com\/(?:p|reel)\/([^\/]+)/);
+      if (match && match[1]) {
+        postCode = match[1];
+        this.logger.info(`Código de post extraído da URL: ${postCode}`);
+      }
+    }
+    
+    if (!postCode) {
+      this.logger.error(`Post não possui código e não foi possível extrair da URL: ${JSON.stringify(post)}`);
+      throw new Error(`Post não possui código: ${JSON.stringify({
+        id: post.id,
+        url: post.url,
+        username: post.username
+      })}`);
     }
     
     // Verificar se é um reel baseado no tipo ou na URL
     const isReel = post.type === 'reel' || (post.url && post.url.includes('/reel/'));
-    
-    // Usar o código diretamente do objeto post
-    const postCode = post.code;
     
     // Se o post já tem URL, usar diretamente; caso contrário, construir
     let targetUrl = post.url;
