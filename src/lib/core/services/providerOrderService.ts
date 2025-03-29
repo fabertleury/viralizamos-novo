@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server';
 import { LinkFormatter } from '../utils/linkFormatter';
 import { Logger } from '../utils/logger';
 import axios from 'axios';
-import crypto from 'crypto';
 
 /**
  * Serviço para envio de pedidos específicos para cada tipo de serviço do provedor
@@ -417,20 +416,19 @@ export class ProviderOrderService {
       // Construir a URL formatada para o perfil para referência interna
       const profileUrl = `https://instagram.com/${username}`;
       
-      // CORREÇÃO: Tratar IDs virtuais - gerar um UUID válido se o post.id for um ID virtual
-      let actualPostId = post.id;
-      if (post.id && post.id.startsWith('virtual-')) {
-        // Gerar um UUID válido
-        actualPostId = crypto.randomUUID();
-        this.logger.info(`ID virtual detectado: ${post.id}. Substituído por UUID válido: ${actualPostId}`);
-      }
+      // CORREÇÃO: Tratar IDs vindos da tabela core_transaction_posts_v2
+      // Como a tabela posts não existe, vamos armazenar apenas nos metadados
+      const actualPostId = null; // Sempre null para evitar erro de chave estrangeira
+      
+      // Registrar nos logs o ID original para referência
+      this.logger.info(`Usando post ID ${post.id} apenas nos metadados (sem salvar na referência post_id)`);
       
       // Registrar o pedido no banco de dados
       const { data: order, error: orderError } = await this.supabase
         .from('core_orders')
         .insert({
           transaction_id: transactionId,
-          post_id: actualPostId, // Usar o UUID válido
+          post_id: actualPostId, // NULL para evitar violação de chave estrangeira
           service_id: serviceId,
           provider_id: providerId,
           external_order_id: externalOrderId,
@@ -443,6 +441,7 @@ export class ProviderOrderService {
             service_type: 'seguidores',
             username: username,
             original_post_id: post.id, // Armazenar o ID original nos metadados para referência
+            post_source: 'core_transaction_posts_v2', // Indicar a fonte do post
             providerRequestData: requestData,
             providerResponse: response.data
           }
@@ -619,20 +618,19 @@ export class ProviderOrderService {
       
       const externalOrderId = response.data.order || String(response.data.id) || `order-${Date.now()}`;
       
-      // CORREÇÃO: Tratar IDs virtuais - gerar um UUID válido se o post.id for um ID virtual
-      let actualPostId = post.id;
-      if (post.id && post.id.startsWith('virtual-')) {
-        // Gerar um UUID válido
-        actualPostId = crypto.randomUUID();
-        this.logger.info(`ID virtual detectado: ${post.id}. Substituído por UUID válido: ${actualPostId}`);
-      }
+      // CORREÇÃO: Tratar IDs vindos da tabela core_transaction_posts_v2
+      // Como a tabela posts não existe, vamos armazenar apenas nos metadados
+      const actualPostId = null; // Sempre null para evitar erro de chave estrangeira
+      
+      // Registrar nos logs o ID original para referência
+      this.logger.info(`Usando post ID ${post.id} apenas nos metadados (sem salvar na referência post_id)`);
       
       // Registrar o pedido no banco de dados
       const { data: order, error: orderError } = await this.supabase
         .from('core_orders')
         .insert({
           transaction_id: transactionId,
-          post_id: actualPostId, // Usar o UUID válido
+          post_id: actualPostId, // NULL para evitar violação de chave estrangeira
           service_id: serviceId,
           provider_id: providerId,
           external_order_id: externalOrderId,
@@ -643,8 +641,9 @@ export class ProviderOrderService {
           metadata: {
             service_type: serviceType,
             post_code: postCode,
-            post_type: isReel ? 'reel' : 'post',
+            post_type: post.type === 'reel' || (post.url && post.url.includes('/reel/')) ? 'reel' : 'post',
             original_post_id: post.id, // Armazenar o ID original nos metadados para referência
+            post_source: 'core_transaction_posts_v2', // Indicar a fonte do post
             providerRequestData: requestData,
             providerResponse: response.data
           }
