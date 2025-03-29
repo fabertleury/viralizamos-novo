@@ -564,7 +564,7 @@ export class ProviderOrderService {
     
     this.logger.info(`Quantidade para post ${postCode}: ${postQuantity} (específica do post: ${post.quantity !== undefined ? 'sim' : 'não'})`);
     
-    // Verificar se o post já tem um pedido existente para evitar duplicação
+    // Verificar se o post já tem um pedido existente para evitar duplicação (usando RPC)
     const { data: duplicateCheck, error: checkError } = await this.supabase.rpc('check_duplicate_order', {
       p_transaction_id: transactionId,
       p_post_code: postCode,
@@ -572,9 +572,12 @@ export class ProviderOrderService {
     });
     
     if (checkError) {
-      this.logger.error(`Erro ao verificar duplicidade: ${checkError.message}`);
+      this.logger.error(`Erro ao verificar duplicidade via RPC: ${checkError.message}`);
     } else if (duplicateCheck && duplicateCheck.has_duplicate) {
-      this.logger.warn(`Pedido duplicado detectado: ${duplicateCheck.message}`);
+      this.logger.warn(`Pedido duplicado detectado via RPC: ${duplicateCheck.message}`);
+      
+      // Registrar bloqueio permanente na tabela core_processing_locks (se ainda não existir)
+      await this.registerLock(postCode, serviceId, duplicateCheck.order_id);
       
       return {
         success: false,
@@ -584,6 +587,54 @@ export class ProviderOrderService {
         postCode: postCode,
         orderId: duplicateCheck.order_id,
         externalOrderId: duplicateCheck.external_order_id
+      };
+    }
+    
+    // Verificação adicional: buscar na tabela core_orders diretamente por target_url e service_id
+    const { data: duplicateOrders } = await this.supabase
+      .from('core_orders')
+      .select('id, external_order_id, status, provider_order_id')
+      .eq('service_id', serviceId)
+      .eq('target_url', targetUrl)
+      .not('status', 'eq', 'error')
+      .order('created_at', { ascending: false })
+      .limit(1);
+      
+    if (duplicateOrders && duplicateOrders.length > 0) {
+      const duplicateOrder = duplicateOrders[0];
+      this.logger.warn(`Pedido duplicado detectado via URL: ${targetUrl} para serviço ${serviceId} (ID: ${duplicateOrder.id})`);
+      
+      // Registrar bloqueio permanente na tabela core_processing_locks (se ainda não existir)
+      await this.registerLock(postCode, serviceId, duplicateOrder.id);
+      
+      return {
+        success: false,
+        error: `Pedido duplicado: URL ${targetUrl} já processada anteriormente para este serviço`,
+        duplicate: true,
+        postId: post.id,
+        postCode: postCode,
+        orderId: duplicateOrder.id,
+        externalOrderId: duplicateOrder.external_order_id || duplicateOrder.provider_order_id
+      };
+    }
+    
+    // Verificar se existe bloqueio na tabela core_processing_locks
+    const { data: lockData } = await this.supabase
+      .from('core_processing_locks')
+      .select('*')
+      .eq('lock_key', `post_${postCode}_service_${serviceId}`)
+      .single();
+      
+    if (lockData) {
+      this.logger.warn(`Pedido bloqueado: encontrado bloqueio existente para post ${postCode} e serviço ${serviceId}`);
+      
+      return {
+        success: false,
+        error: `Post ${postCode} bloqueado para processamento (já foi processado anteriormente)`,
+        duplicate: true,
+        postId: post.id,
+        postCode: postCode,
+        orderId: lockData.order_id
       };
     }
     
@@ -656,6 +707,9 @@ export class ProviderOrderService {
         throw new Error(`Erro ao registrar pedido: ${orderError.message}`);
       }
       
+      // Registrar bloqueio permanente para evitar duplicação futura
+      await this.registerLock(postCode, serviceId, order.id);
+      
       this.logger.success(`Pedido de ${serviceType} registrado com sucesso: ${order.id} para ${targetUrl} (${postQuantity} ${serviceType})`);
       
       return {
@@ -669,6 +723,51 @@ export class ProviderOrderService {
     } catch (error) {
       this.logger.error(`Erro ao enviar pedido: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
       throw error;
+    }
+  }
+
+  private async registerLock(postCode: string, serviceId: string, orderId: string) {
+    try {
+      // Verificar se já existe um bloqueio
+      const { data: existingLock } = await this.supabase
+        .from('core_processing_locks')
+        .select('id')
+        .eq('lock_key', `post_${postCode}_service_${serviceId}`)
+        .single();
+        
+      if (existingLock) {
+        // Bloqueio já existe, não precisa criar novamente
+        this.logger.info(`Bloqueio para post ${postCode} e serviço ${serviceId} já existe.`);
+        return;
+      }
+      
+      // Calcular data de expiração (1 ano no futuro para ser praticamente permanente)
+      const expiresAt = new Date();
+      expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+      
+      // Registrar bloqueio permanente
+      const { error } = await this.supabase
+        .from('core_processing_locks')
+        .insert({
+          lock_key: `post_${postCode}_service_${serviceId}`,
+          locked_by: 'provider-order-service',
+          order_id: orderId,
+          expires_at: expiresAt.toISOString(),
+          metadata: {
+            post_code: postCode,
+            service_id: serviceId,
+            created_at: new Date().toISOString(),
+            reason: 'Proteção contra duplicação de pedidos'
+          }
+        });
+        
+      if (error) {
+        this.logger.error(`Erro ao registrar bloqueio para post ${postCode}: ${error.message}`);
+      } else {
+        this.logger.success(`Bloqueio registrado com sucesso para post ${postCode} no serviço ${serviceId}`);
+      }
+    } catch (error) {
+      this.logger.error(`Erro ao registrar bloqueio: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     }
   }
 } 

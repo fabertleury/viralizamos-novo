@@ -45,7 +45,7 @@ export class OrderProcessor {
   private providerOrderService: ProviderOrderService;
   
   // Configurações para processamento em lote
-  private POSTS_DELAY_MS = 50000; // 50 segundos entre cada post
+  private POSTS_DELAY_MS = 60000; // 60 segundos (1 minuto) entre cada post
   private MAX_POSTS_PER_TRANSACTION = 5;
   
   constructor(
@@ -54,6 +54,94 @@ export class OrderProcessor {
     this.supabase = supabase;
     this.logger = new Logger('OrderProcessor');
     this.providerOrderService = new ProviderOrderService();
+  }
+  
+  /**
+   * Verifica se um pedido já está bloqueado para processamento
+   * @param postCode Código do post
+   * @param serviceId ID do serviço
+   * @returns True se estiver bloqueado, false caso contrário
+   */
+  private async isOrderLocked(postCode: string, serviceId: string): Promise<boolean> {
+    if (!postCode) return false;
+    
+    // Verificar se existe um bloqueio ativo na tabela core_processing_locks
+    const { data, error } = await this.supabase
+      .from('core_processing_locks')
+      .select('*')
+      .eq('lock_key', `post_${postCode}_service_${serviceId}`)
+      .single();
+      
+    if (error || !data) {
+      return false; // Se houver erro ou não encontrar bloqueio, considerar não bloqueado
+    }
+    
+    // Verificar se o bloqueio expirou
+    const expiresAt = new Date(data.expires_at);
+    const now = new Date();
+    
+    if (expiresAt < now) {
+      // Bloqueio expirado, pode remover
+      await this.supabase
+        .from('core_processing_locks')
+        .delete()
+        .eq('id', data.id);
+        
+      return false;
+    }
+    
+    // Bloqueio ainda válido
+    return true;
+  }
+  
+  /**
+   * Adquire um bloqueio para processamento do pedido
+   * @param postCode Código do post
+   * @param serviceId ID do serviço
+   * @param orderId ID do pedido
+   * @returns True se conseguiu adquirir o bloqueio, false caso contrário
+   */
+  private async lockOrder(postCode: string, serviceId: string, orderId: string): Promise<boolean> {
+    if (!postCode) return true; // Se não tiver código, não precisa bloquear
+    
+    try {
+      // Verificar se já está bloqueado
+      const isLocked = await this.isOrderLocked(postCode, serviceId);
+      if (isLocked) {
+        this.logger.warn(`Post ${postCode} já está bloqueado para processamento. Pulando.`);
+        return false;
+      }
+      
+      // Calcular data de expiração (24 horas)
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 24);
+      
+      // Adquirir bloqueio
+      const { error } = await this.supabase
+        .from('core_processing_locks')
+        .insert({
+          lock_key: `post_${postCode}_service_${serviceId}`,
+          locked_by: 'order-processor',
+          order_id: orderId,
+          expires_at: expiresAt.toISOString(),
+          metadata: {
+            post_code: postCode,
+            service_id: serviceId,
+            created_at: new Date().toISOString()
+          }
+        });
+        
+      if (error) {
+        this.logger.error(`Erro ao adquirir bloqueio para post ${postCode}: ${error.message}`);
+        return false;
+      }
+      
+      this.logger.success(`Bloqueio adquirido para post ${postCode} no serviço ${serviceId}`);
+      return true;
+    } catch (error) {
+      this.logger.error(`Erro ao gerenciar bloqueio para post ${postCode}: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      return false;
+    }
   }
   
   /**
@@ -170,8 +258,11 @@ export class OrderProcessor {
     // Limitar número máximo de posts por transação
     const ordersToProcess = orders.slice(0, this.MAX_POSTS_PER_TRANSACTION);
     
+    // Determinar o atraso com base no número de posts
+    const delayMs = ordersToProcess.length > 2 ? 60000 : this.POSTS_DELAY_MS; // 1 minuto se mais de 2 posts
+    
     if (ordersToProcess.length > 1) {
-      this.logger.info(`Processando ${ordersToProcess.length} posts com intervalo de ${this.POSTS_DELAY_MS / 1000} segundos entre eles`);
+      this.logger.info(`Processando ${ordersToProcess.length} posts com intervalo de ${delayMs / 1000} segundos entre eles`);
     }
     
     for (let i = 0; i < ordersToProcess.length; i++) {
@@ -180,8 +271,8 @@ export class OrderProcessor {
       try {
         // Se não for o primeiro post, esperar o tempo configurado
         if (i > 0) {
-          this.logger.info(`Aguardando ${this.POSTS_DELAY_MS / 1000} segundos antes de processar o próximo pedido...`);
-          await new Promise(resolve => setTimeout(resolve, this.POSTS_DELAY_MS));
+          this.logger.info(`Aguardando ${delayMs / 1000} segundos antes de processar o próximo pedido...`);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
         }
         
         this.logger.info(`Processando pedido ${order.id} (${i + 1}/${ordersToProcess.length}) da transação ${order.transaction_id}`);
@@ -209,6 +300,37 @@ export class OrderProcessor {
    */
   private async processOrder(order: OrderData) {
     try {
+      // Extrair código do post do metadata ou da URL
+      const postCode = order.metadata?.post_code || this.extractPostCodeFromUrl(order.target_url);
+      
+      // Se tiver código do post, verificar se já está bloqueado
+      if (postCode) {
+        const isLocked = await this.isOrderLocked(postCode, order.service_id);
+        if (isLocked) {
+          this.logger.warn(`Pedido ${order.id} para post ${postCode} já está bloqueado (já foi processado anteriormente). Pulando.`);
+          
+          // Atualizar o pedido para indicar que foi pulado devido a bloqueio
+          await this.supabase
+            .from('core_orders')
+            .update({
+              status: 'skipped',
+              updated_at: new Date().toISOString(),
+              metadata: {
+                ...(order.metadata || {}),
+                skipped_reason: 'Post já processado anteriormente (bloqueado)',
+                skipped_at: new Date().toISOString()
+              }
+            })
+            .eq('id', order.id);
+            
+          return {
+            order_id: order.id,
+            success: true, // Considerado sucesso para não tentar novamente
+            message: `Pedido pulado: post ${postCode} já processado anteriormente`
+          };
+        }
+      }
+      
       // Obter dados do serviço
       const { data: service, error: serviceError } = await this.supabase
         .from('services')
@@ -237,14 +359,14 @@ export class OrderProcessor {
         if (!postError && post) {
           let targetUrl = post.url || order.target_url;
           const postCode = post.code || (order.metadata?.post_code);
-          const isReel = post.type || (order.metadata?.post_type) === 'reel';
+          const postType = post.type || (order.metadata?.post_type);
           let postId = post.id;
           let postQuantity = null;
           let postCreated = false;
           
           if (!targetUrl) {
             // Construir URL baseada no tipo e código
-            targetUrl = isReel
+            targetUrl = postType === 'reel'
               ? `https://instagram.com/reel/${postCode}/`
               : `https://instagram.com/p/${postCode}/`;
           }
@@ -344,14 +466,14 @@ export class OrderProcessor {
       if (posts.length === 0 && (order.target_url || order.target_username)) {
         let targetUrl = order.target_url;
         const postCode = order.metadata?.post_code;
-        const isReel = order.metadata?.post_type === 'reel';
+        const postType = order.metadata?.post_type;
         let postId = null;
         let postQuantity = null;
         let postCreated = false;
         
         if (!targetUrl) {
           // Construir URL baseada no tipo e código
-          targetUrl = isReel
+          targetUrl = postType === 'reel'
             ? `https://instagram.com/reel/${postCode}/`
             : `https://instagram.com/p/${postCode}/`;
         }
@@ -446,6 +568,47 @@ export class OrderProcessor {
         }
       }
       
+      // Se não tiver posts depois de todas as tentativas, retornar erro
+      if (posts.length === 0) {
+        this.logger.error(`Nenhum post válido encontrado para o pedido ${order.id}`);
+        return {
+          order_id: order.id,
+          success: false,
+          error: 'Nenhum post válido encontrado para processar'
+        };
+      }
+      
+      // Processar o primeiro post da lista
+      const post = posts[0];
+      
+      // Se tiver código do post e serviço não for de seguidores, adquirir bloqueio
+      if (post.code && service.type.toLowerCase() !== 'seguidores') {
+        const lockAcquired = await this.lockOrder(post.code, order.service_id, order.id);
+        if (!lockAcquired) {
+          this.logger.warn(`Não foi possível adquirir bloqueio para o post ${post.code}. Pulando para evitar duplicação.`);
+          
+          // Atualizar o pedido para indicar que foi pulado devido a falha no bloqueio
+          await this.supabase
+            .from('core_orders')
+            .update({
+              status: 'skipped',
+              updated_at: new Date().toISOString(),
+              metadata: {
+                ...(order.metadata || {}),
+                skipped_reason: 'Não foi possível adquirir bloqueio para o post',
+                skipped_at: new Date().toISOString()
+              }
+            })
+            .eq('id', order.id);
+            
+          return {
+            order_id: order.id,
+            success: true, // Considerado sucesso para não tentar novamente
+            message: `Pedido pulado: não foi possível adquirir bloqueio para o post ${post.code}`
+          };
+        }
+      }
+      
       // Determinar o tipo de serviço
       const serviceType = order.metadata?.service_type || service.type || 'unknown';
       
@@ -510,20 +673,45 @@ export class OrderProcessor {
           };
         }
       } else {
-        this.logger.error(`Resultado inválido ao enviar pedido ${order.id} para o provedor`);
+        this.logger.error(`Resultado inválido ao enviar pedido ${order.id}: ${JSON.stringify(result)}`);
+        
+        await this.supabase
+          .from('core_orders')
+          .update({
+            status: 'error',
+            updated_at: new Date().toISOString(),
+            metadata: {
+              ...(order.metadata || {}),
+              error: 'Resultado inválido ao enviar pedido'
+            }
+          })
+          .eq('id', order.id);
+          
         return {
           order_id: order.id,
           success: false,
-          error: 'Resultado inválido do provedor'
+          error: 'Resultado inválido ao enviar pedido'
         };
       }
     } catch (error) {
-      this.logger.error(`Erro ao processar pedido ${order.id}: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      this.logger.error(`Erro ao processar pedido: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
       return {
         order_id: order.id,
         success: false,
         error: error instanceof Error ? error.message : 'Erro desconhecido'
       };
     }
+  }
+  
+  /**
+   * Extrai o código do post da URL
+   * @param url URL do post
+   * @returns Código do post ou undefined se não for possível extrair
+   */
+  private extractPostCodeFromUrl(url?: string): string | undefined {
+    if (!url || !url.includes('instagram.com')) return undefined;
+    
+    const match = url.match(/instagram\.com\/(?:p|reel)\/([^\/]+)/);
+    return match?.[1];
   }
 } 

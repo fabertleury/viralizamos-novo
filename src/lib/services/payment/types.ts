@@ -52,9 +52,12 @@ export interface TransactionProcessResult {
   reason?: string;
   payment_status?: string;
   result?: {
-    status: 'created' | 'updated' | 'error' | string;
+    status: 'created' | 'updated' | 'processed' | 'error' | string;
     order_id?: string;
     error?: string;
+    message?: string;
+    success_count?: number;
+    error_count?: number;
   };
   error?: string;
 }
