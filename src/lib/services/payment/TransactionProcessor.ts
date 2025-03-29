@@ -195,59 +195,54 @@ export class TransactionProcessor {
         };
       }
       
-      // Buscar posts associados à transação na tabela core_transaction_posts_v2
-      const { data: transactionPosts, error: postsError } = await this.supabase
+      // Buscar posts associados à transação
+      const { data: posts, error: postsError } = await this.supabase
         .from('core_transaction_posts_v2')
         .select('*')
-        .eq('transaction_id', transaction.id);
+        .eq('transaction_id', transaction.id)
+        .eq('selected', true); // Filtrar diretamente apenas posts que tem selected=true no banco
         
       if (postsError) {
-        this.logger.error(`Erro ao buscar posts da transação ${transaction.id}: ${postsError.message}`);
-        return {
+        this.logger.error(`Erro ao buscar posts da transação: ${postsError.message}`);
+        return { 
           status: 'error',
           reason: 'Erro ao buscar posts da transação',
-          error: postsError.message
+          error: postsError.message 
         };
       }
       
-      // Se encontrou posts, criar uma ordem para cada post
-      this.logger.info(`Encontrados ${transactionPosts.length} posts na tabela core_transaction_posts_v2`);
+      if (!posts || posts.length === 0) {
+        this.logger.warn(`Transação ${transaction.id} não possui posts selecionados`);
+        return { 
+          status: 'error',
+          reason: 'Sem posts selecionados',
+          error: 'Transação não possui posts selecionados' 
+        };
+      }
+      
+      this.logger.info(`Encontrados ${posts.length} posts selecionados (selected=true) para processar na transação ${transaction.id}`);
       
       // Verificar quais posts já têm ordens na core_orders para esta transação
       // e garantir que não sejam duplicados
-      const { data: existingOrders, error: existingOrdersError } = await this.supabase
-        .from('core_orders')
-        .select('id, metadata, status, target_url')
-        .eq('transaction_id', transaction.id);
-      
-      if (existingOrdersError) {
-        this.logger.error(`Erro ao verificar ordens existentes para transação ${transaction.id}: ${existingOrdersError.message}`);
-      }
-      
-      // Mapear ordens existentes por post_code e url para verificação precisa
       const existingOrdersMap = new Map();
       
-      if (existingOrders && existingOrders.length > 0) {
-        this.logger.warn(`🔍 ATENÇÃO: Encontradas ${existingOrders.length} ordens existentes para transação ${transaction.id}`);
+      for (const order of posts) {
+        // Mapear por metadata.post_code
+        if (order.metadata?.post_code) {
+          existingOrdersMap.set(order.metadata.post_code, {
+            orderId: order.id,
+            status: order.status
+          });
+          this.logger.info(`Ordem existente: ${order.id} para post_code ${order.metadata.post_code}`);
+        }
         
-        for (const order of existingOrders) {
-          // Mapear por metadata.post_code
-          if (order.metadata?.post_code) {
-            existingOrdersMap.set(order.metadata.post_code, {
-              orderId: order.id,
-              status: order.status
-            });
-            this.logger.info(`Ordem existente: ${order.id} para post_code ${order.metadata.post_code}`);
-          }
-          
-          // Mapear também por URL
-          if (order.target_url) {
-            existingOrdersMap.set(order.target_url, {
-              orderId: order.id,
-              status: order.status
-            });
-            this.logger.info(`Ordem existente: ${order.id} para URL ${order.target_url}`);
-          }
+        // Mapear também por URL
+        if (order.target_url) {
+          existingOrdersMap.set(order.target_url, {
+            orderId: order.id,
+            status: order.status
+          });
+          this.logger.info(`Ordem existente: ${order.id} para URL ${order.target_url}`);
         }
       }
       
@@ -255,7 +250,7 @@ export class TransactionProcessor {
       const postsToProcess = [];
       const skippedPosts = [];
       
-      for (const post of transactionPosts) {
+      for (const post of posts) {
         // Verificar se o post já tem uma ordem na tabela core_orders
         const hasOrderByCode = post.post_code && existingOrdersMap.has(post.post_code);
         

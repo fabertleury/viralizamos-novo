@@ -375,30 +375,13 @@ export class OrderProcessor {
           const existingOrder = existingProcessedOrders[0];
           this.logger.warn(`⚠️ DUPLICAÇÃO DETECTADA: Já existe um pedido (${existingOrder.id}) para transaction_id=${order.transaction_id}, service_id=${order.service_id}, post_code=${postCode}. Pulando pedido atual (${order.id}).`);
           
-          // Atualizar o pedido atual para indicar que foi pulado devido a duplicação
-          await this.supabase
-            .from('core_orders')
-            .update({
-              status: 'skipped',
-              external_order_id: existingOrder.external_order_id, // Copiar o external_order_id do pedido existente
-              provider_order_id: existingOrder.provider_order_id, // Copiar o provider_order_id do pedido existente
-              updated_at: new Date().toISOString(),
-              metadata: {
-                ...(order.metadata || {}),
-                skipped_reason: 'Pedido duplicado (mesmo transaction_id, service_id e post_code)',
-                skipped_at: new Date().toISOString(),
-                duplicate_order_id: existingOrder.id,
-                external_order_id: existingOrder.external_order_id,
-                provider_order_id: existingOrder.provider_order_id
-              }
-            })
-            .eq('id', order.id);
-            
+          // Não criar uma entrada com status 'skipped', apenas logar e retornar
+          this.logger.info(`Pedido ${order.id} será pulado sem criar entrada duplicada com status 'skipped'`);
+          
           return {
-            order_id: order.id,
-            success: true, // Considerado sucesso para não tentar novamente
-            message: `Pedido pulado: já existe um pedido processado para esta transação, serviço e post`,
-            external_order_id: existingOrder.external_order_id
+            status: 'skipped',
+            orderId: order.id,
+            message: `Pedido pulado: já existe um pedido processado para esta transação, serviço e post (${existingOrder.id})`,
           };
         }
       }
@@ -409,23 +392,12 @@ export class OrderProcessor {
         if (isLocked) {
           this.logger.warn(`Pedido ${order.id} para post ${postCode} já está bloqueado (já foi processado anteriormente). Pulando.`);
           
-          // Atualizar o pedido para indicar que foi pulado devido a bloqueio
-          await this.supabase
-            .from('core_orders')
-            .update({
-              status: 'skipped',
-              updated_at: new Date().toISOString(),
-              metadata: {
-                ...(order.metadata || {}),
-                skipped_reason: 'Post já processado anteriormente (bloqueado)',
-                skipped_at: new Date().toISOString()
-              }
-            })
-            .eq('id', order.id);
-            
+          // Não criar uma entrada com status 'skipped', apenas logar e retornar
+          this.logger.info(`Pedido ${order.id} será pulado sem criar entrada duplicada com status 'skipped'`);
+          
           return {
-            order_id: order.id,
-            success: true, // Considerado sucesso para não tentar novamente
+            status: 'skipped',
+            orderId: order.id,
             message: `Pedido pulado: post ${postCode} já processado anteriormente`
           };
         }
@@ -445,24 +417,12 @@ export class OrderProcessor {
         if (existingOrders && existingOrders.length > 0) {
           this.logger.warn(`Pedido ${order.id} com URL ${order.target_url} já foi processado anteriormente (pedido existente: ${existingOrders[0].id}). Pulando.`);
           
-          // Atualizar o pedido para indicar que foi pulado devido a duplicação
-          await this.supabase
-            .from('core_orders')
-            .update({
-              status: 'skipped',
-              updated_at: new Date().toISOString(),
-              metadata: {
-                ...(order.metadata || {}),
-                skipped_reason: 'URL já processada anteriormente',
-                skipped_at: new Date().toISOString(),
-                duplicate_order_id: existingOrders[0].id
-              }
-            })
-            .eq('id', order.id);
-            
+          // Não criar uma entrada com status 'skipped', apenas logar e retornar
+          this.logger.info(`Pedido ${order.id} será pulado sem criar entrada duplicada com status 'skipped'`);
+          
           return {
-            order_id: order.id,
-            success: true, // Considerado sucesso para não tentar novamente
+            status: 'skipped',
+            orderId: order.id,
             message: `Pedido pulado: URL ${order.target_url} já processada anteriormente`
           };
         }
@@ -724,23 +684,12 @@ export class OrderProcessor {
         if (!lockAcquired) {
           this.logger.warn(`Não foi possível adquirir bloqueio para o post ${post.code}. Pulando para evitar duplicação.`);
           
-          // Atualizar o pedido para indicar que foi pulado devido a falha no bloqueio
-          await this.supabase
-            .from('core_orders')
-            .update({
-              status: 'skipped',
-              updated_at: new Date().toISOString(),
-              metadata: {
-                ...(order.metadata || {}),
-                skipped_reason: 'Não foi possível adquirir bloqueio para o post',
-                skipped_at: new Date().toISOString()
-              }
-            })
-            .eq('id', order.id);
-            
+          // Não criar uma entrada com status 'skipped', apenas logar e retornar
+          this.logger.info(`Pedido ${order.id} será pulado sem criar entrada duplicada com status 'skipped'`);
+          
           return {
-            order_id: order.id,
-            success: true, // Considerado sucesso para não tentar novamente
+            status: 'skipped',
+            orderId: order.id,
             message: `Pedido pulado: não foi possível adquirir bloqueio para o post ${post.code}`
           };
         }

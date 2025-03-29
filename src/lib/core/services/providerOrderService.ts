@@ -408,11 +408,27 @@ export class ProviderOrderService {
       
       // Validar a resposta do provedor
       if (!response.data || response.data.error) {
+        // Log de erro detalhado no console
+        console.log('\n====== ERRO DO PROVEDOR ======');
+        console.log(`URL enviada: ${apiUrl}`);
+        console.log(`Quantidade: ${followerQuantity}`);
+        console.log(`Serviço ID externo: ${serviceExternalId}`);
+        console.log('Resposta de erro:', JSON.stringify(response.data, null, 2));
+        console.log('==============================\n');
+        
         throw new Error(`Erro do provedor: ${response.data?.error || 'Resposta inválida'}`);
       }
       
       // Logar a resposta completa do provedor para depuração
       this.logger.info(`Resposta do provedor: ${JSON.stringify(response.data)}`);
+      
+      // Log no console para visualização imediata no terminal
+      console.log('\n====== RESPOSTA DO PROVEDOR ======');
+      console.log(`URL enviada: https://instagram.com/${username}`);
+      console.log(`Quantidade: ${followerQuantity}`);
+      console.log(`Serviço ID externo: ${serviceExternalId}`);
+      console.log(`Resposta completa: `, JSON.stringify(response.data, null, 2));
+      console.log('==================================\n');
       
       // Extrair o ID da ordem com tratamento para diferentes formatos de resposta
       let externalOrderId;
@@ -735,11 +751,27 @@ export class ProviderOrderService {
       
       // Validar a resposta do provedor
       if (!response.data || response.data.error) {
+        // Log de erro detalhado no console
+        console.log('\n====== ERRO DO PROVEDOR ======');
+        console.log(`URL enviada: ${targetUrl}`);
+        console.log(`Quantidade: ${postQuantity}`);
+        console.log(`Serviço ID externo: ${serviceExternalId}`);
+        console.log('Resposta de erro:', JSON.stringify(response.data, null, 2));
+        console.log('==============================\n');
+        
         throw new Error(`Erro do provedor: ${response.data?.error || 'Resposta inválida'}`);
       }
       
       // Logar a resposta completa do provedor para depuração
       this.logger.info(`Resposta do provedor: ${JSON.stringify(response.data)}`);
+      
+      // Log no console para visualização imediata no terminal
+      console.log('\n====== RESPOSTA DO PROVEDOR ======');
+      console.log(`URL enviada: ${targetUrl}`);
+      console.log(`Quantidade: ${postQuantity}`);
+      console.log(`Serviço ID externo: ${serviceExternalId}`);
+      console.log(`Resposta completa: `, JSON.stringify(response.data, null, 2));
+      console.log('==================================\n');
       
       // Extrair o ID da ordem com tratamento para diferentes formatos de resposta
       let externalOrderId;
@@ -798,6 +830,16 @@ export class ProviderOrderService {
       await this.registerLock(postCode, serviceId, order.id);
       
       this.logger.success(`Pedido de ${serviceType} registrado com sucesso: ${order.id} para ${targetUrl} (${postQuantity} ${serviceType})`);
+      
+      // Log de console para o pedido criado
+      console.log('\n====== PEDIDO CRIADO NO BANCO ======');
+      console.log(`ID do pedido: ${order.id}`);
+      console.log(`ID externo: ${externalOrderId}`);
+      console.log(`Post: ${postCode}`);
+      console.log(`URL: ${targetUrl}`);
+      console.log(`Tipo de serviço: ${serviceType}`);
+      console.log(`Quantidade: ${postQuantity}`);
+      console.log('====================================\n');
       
       return {
         success: true,

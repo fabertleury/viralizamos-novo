@@ -303,6 +303,7 @@ export default function AcompanharPedidoPage() {
           provider:provider_id (*)
         `)
         .in('transaction_id', transactionIds)
+        .not('status', 'in', '("skipped","error")') // Excluir pedidos com status 'skipped' ou 'error'
         .order('created_at', { ascending: false });
             
       if (ordersError) {
