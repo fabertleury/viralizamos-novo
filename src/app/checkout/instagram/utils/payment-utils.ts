@@ -218,7 +218,9 @@ export const sendTransactionToAdmin = async (
         url: post.postLink,
         type: post.postLink.includes('/reel/') ? 'REEL' : 'POST',
         caption: '',
-        media_type: post.postLink.includes('/reel/') ? 'VIDEO' : 'IMAGE'
+        media_type: post.postLink.includes('/reel/') ? 'VIDEO' : 'IMAGE',
+        selected: true,
+        post_code: post.postCode
       }))
     };
     

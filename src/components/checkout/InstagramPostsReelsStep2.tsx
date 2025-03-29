@@ -989,7 +989,8 @@ export function InstagramPostsReelsStep2({ serviceType, title }: InstagramPostsR
         postLink: `https://instagram.com/p/${postCode}`,
         quantity: quantidades[index], // Usar a quantidade correta do array de quantidades
         type: 'post', // Adicionar tipo explícito para posts
-        imageUrl: post.image_url || post.thumbnail_url || post.display_url || ''
+        imageUrl: post.image_url || post.thumbnail_url || post.display_url || '',
+        selected: true // Adicionar explicitamente o campo selected como true
       };
     });
 
@@ -1002,7 +1003,8 @@ export function InstagramPostsReelsStep2({ serviceType, title }: InstagramPostsR
         postLink: `https://instagram.com/reel/${reelCode}`,
         quantity: quantidades[selectedPosts.length + index], // Usar a quantidade correta, considerando o offset dos posts
         type: 'reel', // Adicionar tipo explícito para reels
-        imageUrl: reel.image_url || reel.thumbnail_url || reel.display_url || ''
+        imageUrl: reel.image_url || reel.thumbnail_url || reel.display_url || '',
+        selected: true // Adicionar explicitamente o campo selected como true
       };
     });
 

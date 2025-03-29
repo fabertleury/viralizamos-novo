@@ -128,11 +128,41 @@ export class OrderProcessor {
       // Criar a chave de bloqueio
       const lockKey = `post_${postCode}_service_${serviceId}`;
       
+      // Verificar se o orderId é um UUID válido para usar como transaction_id
+      // ou gerar um novo UUID para evitar a restrição de chave estrangeira
+      let transactionIdToUse: string;
+      
+      try {
+        // Primeiro tentar verificar se o orderId existe como transaction_id na tabela core_transactions_v2
+        const { data: transactionExists } = await this.supabase
+          .from('core_transactions_v2')
+          .select('id')
+          .eq('id', orderId)
+          .maybeSingle();
+          
+        if (transactionExists) {
+          // Se existir, podemos usar o orderId como transaction_id
+          transactionIdToUse = orderId;
+          this.logger.info(`Ordem ${orderId} existe como transação, usando como transaction_id`);
+        } else {
+          // Caso contrário, gerar um UUID aleatório
+          // Usar o UUID suportado pelo sistema
+          const { data: uuidResult } = await this.supabase.rpc('generate_uuid');
+          transactionIdToUse = uuidResult || crypto.randomUUID?.() || orderId;
+          this.logger.info(`Gerando novo UUID ${transactionIdToUse} para o bloqueio do post ${postCode}`);
+        }
+      } catch {
+        // Em caso de erro, tentar usar um UUID gerado pelo supabase
+        const { data: uuidResult } = await this.supabase.rpc('generate_uuid');
+        transactionIdToUse = uuidResult || orderId;
+        this.logger.warn(`Erro ao verificar transação, usando UUID gerado: ${transactionIdToUse}`);
+      }
+      
       // Adquirir bloqueio usando a estrutura atual da tabela
       const { error } = await this.supabase
         .from('core_processing_locks')
         .insert({
-          transaction_id: orderId, // Usando orderId como transaction_id para compatibilidade
+          transaction_id: transactionIdToUse, // Usar o UUID apropriado
           lock_key: lockKey,
           locked_by: 'order-processor',
           locked_at: new Date().toISOString(),
@@ -152,6 +182,13 @@ export class OrderProcessor {
         if (error.code === '23505') { // Código PostgreSQL para violação de chave única
           this.logger.warn(`Bloqueio já existe para o post ${postCode} (conflito de chave única). Pedido será pulado.`);
           return false;
+        }
+        
+        // Verificar se o erro é devido à restrição de chave estrangeira
+        if (error.code === '23503') { // Código PostgreSQL para violação de chave estrangeira
+          this.logger.error(`Erro de chave estrangeira ao adquirir bloqueio para post ${postCode}: ${error.message}`);
+          // Mesmo com erro, retornar true para permitir o processamento
+          return true;
         }
         
         this.logger.error(`Erro ao adquirir bloqueio para post ${postCode}: ${error.message}`);

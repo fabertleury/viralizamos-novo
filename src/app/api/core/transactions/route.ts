@@ -84,7 +84,8 @@ export async function POST(request: NextRequest) {
         post_id: post.id,
         post_url: post.url || post.media_url,
         post_type: post.type || post.media_type,
-        post_data: post
+        post_data: post,
+        selected: true
       }));
 
       const { error: postsError } = await supabase
