@@ -2,7 +2,7 @@
  * Sistema de logging centralizado para a aplicação
  * 
  * Este módulo fornece funções para logging consistente em toda a aplicação,
- * com níveis de severidade e formatação padronizada.
+ * com níveis de severidade e formatação padronizada.!
  */
 
 // Níveis de log disponíveis
