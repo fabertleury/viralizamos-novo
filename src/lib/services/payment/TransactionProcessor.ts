@@ -258,38 +258,24 @@ export class TransactionProcessor {
         this.logger.info(`Encontrados ${transactionPosts.length} posts na tabela core_transaction_posts_v2`);
         
         // Filtrar apenas os posts que foram selecionados pelo usuário
-        const selectedPosts = transactionPosts.filter(post => {
-          // Verificar se o post foi selecionado (suporta diferentes formatos: true, 1, '1', 'true')
-          const selected = post.selected;
-          
-          this.logger.info(`Verificando post ${post.id} (${post.post_code}): selected=${JSON.stringify(selected)}, tipo=${typeof selected}`);
-          
-          return selected === true || 
-                 selected === 1 || 
-                 selected === '1' || 
-                 selected === 'true' ||
-                 selected === 'yes' ||
-                 selected === 'sim';
-        });
+        // Em vez de filtrar, vamos considerar todos os posts como selecionados
+        // já que esses posts já foram explicitamente adicionados pelo usuário no checkout
         
-        this.logger.info(`Filtrando apenas ${selectedPosts.length} posts selecionados pelo usuário dos ${transactionPosts.length} disponíveis`);
+        // Adicionando mensagem de log para debugging
+        this.logger.info(`IMPORTANTE: Considerando todos os ${transactionPosts.length} posts como selecionados para processamento`);
         
-        if (selectedPosts.length === 0) {
-          this.logger.warn(`⚠️ IMPORTANTE: Nenhum post selecionado encontrado na transação ${transaction.id}!`);
-          this.logger.warn(`Por razões de segurança, o sistema NÃO processará automaticamente todos os posts.`);
-          this.logger.warn(`Isso pode indicar um problema na interface de seleção ou o usuário realmente não selecionou nenhum post.`);
-          
-          // Se nenhum post está selecionado, devemos realmente fazer fallback para todos?
-          // É mais seguro não processar nenhum e alertar o operador
+        // Usar todos os posts disponíveis em vez de apenas os marcados como selecionados
+        const postsToProcess = transactionPosts;
+        
+        // Se não houver posts, retornar erro
+        if (postsToProcess.length === 0) {
+          this.logger.warn(`⚠️ IMPORTANTE: Nenhum post encontrado na transação ${transaction.id}!`);
           return {
             status: 'error',
-            reason: 'Nenhum post selecionado pelo usuário',
-            error: 'Transação tem posts, mas nenhum foi explicitamente selecionado pelo usuário'
+            reason: 'Nenhum post encontrado',
+            error: 'Transação não possui posts associados para processamento'
           };
         }
-        
-        // Usar apenas os posts explicitamente selecionados
-        const postsToProcess = selectedPosts;
         
         // Rastrear ordens já criadas para não criar duplicatas
         const existingOrdersForPosts = new Map();
