@@ -8,6 +8,13 @@ import { redirect } from 'next/navigation';
 import Script from 'next/script';
 import ClientLayout from '@/components/layout/ClientLayout';
 
+// Importar arquivo de inicialização de serviços em background
+// Este import garante que os serviços sejam inicializados 
+// automaticamente quando o servidor iniciar
+if (typeof window === 'undefined') {
+  import('@/lib/services/startup');
+}
+
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
