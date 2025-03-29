@@ -111,15 +111,107 @@ export async function processApprovedPayments(): Promise<{ success: boolean; mes
     
     console.log(`Encontradas ${transactions.length} transações aprovadas para processamento.`);
     
+    // Verificar posts selecionados por transação para análise prévia
+    const transactionPostsDetails = [];
+    
+    for (const transaction of transactions) {
+      try {
+        // Buscar posts da transação na tabela core_transaction_posts_v2
+        const { data: posts } = await supabase
+          .from('core_transaction_posts_v2')
+          .select('*')
+          .eq('transaction_id', transaction.id);
+          
+        if (posts && posts.length > 0) {
+          // Identificar posts selecionados
+          const selectedPosts = posts.filter(post => {
+            const selected = post.selected;
+            return selected === true || 
+                   selected === 1 || 
+                   selected === '1' || 
+                   selected === 'true' || 
+                   selected === 'yes' || 
+                   selected === 'sim';
+          });
+          
+          transactionPostsDetails.push({
+            transactionId: transaction.id,
+            totalPosts: posts.length,
+            selectedPosts: selectedPosts.length,
+            hasSelectedPosts: selectedPosts.length > 0
+          });
+          
+          console.log(`Transação ${transaction.id}: ${posts.length} posts totais, ${selectedPosts.length} selecionados`);
+        } else {
+          console.log(`Transação ${transaction.id}: Nenhum post associado`);
+          transactionPostsDetails.push({
+            transactionId: transaction.id,
+            totalPosts: 0,
+            selectedPosts: 0,
+            hasSelectedPosts: false
+          });
+        }
+      } catch (err) {
+        console.error(`Erro ao verificar posts da transação ${transaction.id}:`, err);
+      }
+    }
+    
+    // Abordagem alternativa para verificar transações que já têm ordens
+    const transactionsWithOrders = new Set();
+    
+    // Verificar uma a uma para evitar o uso do group
+    for (const transactionId of transactions.map(t => t.id)) {
+      const { count, error: countError } = await supabase
+        .from('core_orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('transaction_id', transactionId)
+        .neq('status', 'error');
+        
+      if (!countError && count && count > 0) {
+        console.log(`Transação ${transactionId} já tem ${count} ordens existentes`);
+        transactionsWithOrders.add(transactionId);
+      }
+    }
+    
+    if (transactionsWithOrders.size > 0) {
+      console.log(`Encontradas ${transactionsWithOrders.size} transações que já têm ordens existentes`);
+    }
+    
     // Processar cada transação
     const transactionProcessor = new TransactionProcessor(supabase);
     const orderProcessor = new OrderProcessor(supabase);
     
     let processedCount = 0;
+    let skippedCount = 0;
     let errorCount = 0;
     
     for (const transaction of transactions) {
       try {
+        // Verificar se a transação já tem ordens
+        if (transactionsWithOrders.has(transaction.id)) {
+          console.log(`Transação ${transaction.id} já tem ordens existentes. Marcando como processada.`);
+          
+          // Atualizar o status order_created para true
+          await supabase
+            .from('core_transactions_v2')
+            .update({
+              order_created: true,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', transaction.id);
+            
+          skippedCount++;
+          continue;
+        }
+        
+        // Verificar se tem posts selecionados para essa transação
+        const postsDetail = transactionPostsDetails.find(p => p.transactionId === transaction.id);
+        
+        if (postsDetail && postsDetail.totalPosts > 0 && !postsDetail.hasSelectedPosts) {
+          console.warn(`⚠️ ATENÇÃO: Transação ${transaction.id} tem ${postsDetail.totalPosts} posts, mas NENHUM selecionado!`);
+          console.log(`Verificar se o usuário realmente não selecionou nenhum post ou se há um problema com a seleção.`);
+        }
+        
         console.log(`Processando transação ${transaction.id}...`);
         
         const result = await transactionProcessor.processTransaction(transaction);
@@ -127,10 +219,6 @@ export async function processApprovedPayments(): Promise<{ success: boolean; mes
         if (result && result.status === 'processed') {
           console.log(`Transação ${transaction.id} processada com sucesso!`);
           processedCount++;
-          
-          // Processar pedidos pendentes para envio ao provedor
-          console.log('Processando pedidos pendentes...');
-          await orderProcessor.processPendingOrders();
         } else {
           console.warn(`Transação ${transaction.id} não foi processada: ${result?.reason || 'Razão desconhecida'}`);
           errorCount++;
@@ -144,9 +232,21 @@ export async function processApprovedPayments(): Promise<{ success: boolean; mes
       await new Promise(resolve => setTimeout(resolve, 500));
     }
     
+    // Processar pedidos pendentes para envio ao provedor apenas uma vez após todas as transações
+    if (processedCount > 0) {
+      console.log('Processando pedidos pendentes (uma única vez para todas as transações)...');
+      const processingResult = await orderProcessor.processPendingOrders();
+      
+      console.log(`Resultado do processamento de pedidos pendentes: ${
+        processingResult.success 
+          ? `${processingResult.success_count || 0} com sucesso, ${processingResult.error_count || 0} com erro` 
+          : `Falha: ${processingResult.error || 'Erro desconhecido'}`
+      }`);
+    }
+    
     return { 
       success: true, 
-      message: `Processamento concluído: ${processedCount} transações processadas, ${errorCount} com erro.` 
+      message: `Processamento concluído: ${processedCount} transações processadas, ${skippedCount} puladas, ${errorCount} com erro.` 
     };
   } catch (error) {
     console.error('Erro ao processar pagamentos aprovados:', error);

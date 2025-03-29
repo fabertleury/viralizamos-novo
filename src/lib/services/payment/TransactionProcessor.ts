@@ -257,10 +257,78 @@ export class TransactionProcessor {
         // Se encontrou posts, criar uma ordem para cada post
         this.logger.info(`Encontrados ${transactionPosts.length} posts na tabela core_transaction_posts_v2`);
         
+        // Filtrar apenas os posts que foram selecionados pelo usuário
+        const selectedPosts = transactionPosts.filter(post => {
+          // Verificar se o post foi selecionado (suporta diferentes formatos: true, 1, '1', 'true')
+          const selected = post.selected;
+          
+          this.logger.info(`Verificando post ${post.id} (${post.post_code}): selected=${JSON.stringify(selected)}, tipo=${typeof selected}`);
+          
+          return selected === true || 
+                 selected === 1 || 
+                 selected === '1' || 
+                 selected === 'true' ||
+                 selected === 'yes' ||
+                 selected === 'sim';
+        });
+        
+        this.logger.info(`Filtrando apenas ${selectedPosts.length} posts selecionados pelo usuário dos ${transactionPosts.length} disponíveis`);
+        
+        if (selectedPosts.length === 0) {
+          this.logger.warn(`⚠️ IMPORTANTE: Nenhum post selecionado encontrado na transação ${transaction.id}!`);
+          this.logger.warn(`Por razões de segurança, o sistema NÃO processará automaticamente todos os posts.`);
+          this.logger.warn(`Isso pode indicar um problema na interface de seleção ou o usuário realmente não selecionou nenhum post.`);
+          
+          // Se nenhum post está selecionado, devemos realmente fazer fallback para todos?
+          // É mais seguro não processar nenhum e alertar o operador
+          return {
+            status: 'error',
+            reason: 'Nenhum post selecionado pelo usuário',
+            error: 'Transação tem posts, mas nenhum foi explicitamente selecionado pelo usuário'
+          };
+        }
+        
+        // Usar apenas os posts explicitamente selecionados
+        const postsToProcess = selectedPosts;
+        
+        // Rastrear ordens já criadas para não criar duplicatas
+        const existingOrdersForPosts = new Map();
+        
+        // Verificar se já existem ordens para estes posts na transação atual
+        const { data: existingOrders } = await this.supabase
+          .from('core_orders')
+          .select('id, metadata, status')
+          .eq('transaction_id', txDetails.id)
+          .neq('status', 'error');
+          
+        if (existingOrders && existingOrders.length > 0) {
+          this.logger.info(`Encontradas ${existingOrders.length} ordens existentes para a transação ${txDetails.id}`);
+          
+          // Mapear ordens existentes por post_code ou post_id
+          for (const order of existingOrders) {
+            const metadata = order.metadata || {};
+            if (metadata.post_code) {
+              existingOrdersForPosts.set(metadata.post_code, order.id);
+              this.logger.info(`Mapeada ordem existente ${order.id} para post_code ${metadata.post_code}`);
+            }
+            if (metadata.post_id) {
+              existingOrdersForPosts.set(metadata.post_id, order.id);
+              this.logger.info(`Mapeada ordem existente ${order.id} para post_id ${metadata.post_id}`);
+            }
+          }
+        }
+        
         let ordersCreated = 0;
         let ordersWithErrors = 0;
         
-        for (const post of transactionPosts) {
+        for (const post of postsToProcess) {
+          // Verificar se já existe uma ordem para este post
+          if (existingOrdersForPosts.has(post.post_code) || existingOrdersForPosts.has(post.id)) {
+            const existingOrderId = existingOrdersForPosts.get(post.post_code) || existingOrdersForPosts.get(post.id);
+            this.logger.warn(`Pulando criação de ordem para post ${post.id} (${post.post_code}) - já existe ordem ${existingOrderId}`);
+            continue; // Pular para o próximo post
+          }
+          
           // Usar a quantidade específica do post ou do metadata da transação
           const quantity = post.quantity || 
                            txDetails.metadata?.quantity || 
@@ -328,8 +396,26 @@ export class TransactionProcessor {
         
         this.logger.info(`Criadas ${ordersCreated} ordens com sucesso. ${ordersWithErrors} ordens com erro.`);
         
+        // Log de posts que foram pulados por causa de ordens existentes
+        const skippedPosts = postsToProcess.filter(post => 
+          existingOrdersForPosts.has(post.post_code) || existingOrdersForPosts.has(post.id)
+        );
+        
+        if (skippedPosts.length > 0) {
+          this.logger.info(`Pulados ${skippedPosts.length} posts que já tinham ordens existentes.`);
+        }
+        
         // Se nenhuma ordem foi criada com sucesso, retornar erro
         if (ordersCreated === 0) {
+          // Se foram pulados todos os posts, considerar um sucesso
+          if (skippedPosts.length === postsToProcess.length) {
+            this.logger.info(`Todos os ${postsToProcess.length} posts já tinham ordens existentes. Nada a fazer.`);
+            return {
+              status: 'processed',
+              reason: 'Todos os posts já tinham ordens existentes'
+            };
+          }
+          
           return {
             status: 'error',
             reason: 'Erro ao criar ordens para os posts',
