@@ -199,8 +199,7 @@ export class TransactionProcessor {
       const { data: posts, error: postsError } = await this.supabase
         .from('core_transaction_posts_v2')
         .select('*')
-        .eq('transaction_id', transaction.id)
-        .eq('selected', true); // Filtrar diretamente apenas posts que tem selected=true no banco
+        .eq('transaction_id', transaction.id);
         
       if (postsError) {
         this.logger.error(`Erro ao buscar posts da transação: ${postsError.message}`);
@@ -212,15 +211,15 @@ export class TransactionProcessor {
       }
       
       if (!posts || posts.length === 0) {
-        this.logger.warn(`Transação ${transaction.id} não possui posts selecionados`);
+        this.logger.warn(`Transação ${transaction.id} não possui posts associados`);
         return { 
           status: 'error',
-          reason: 'Sem posts selecionados',
-          error: 'Transação não possui posts selecionados' 
+          reason: 'Sem posts associados',
+          error: 'Transação não possui posts associados' 
         };
       }
       
-      this.logger.info(`Encontrados ${posts.length} posts selecionados (selected=true) para processar na transação ${transaction.id}`);
+      this.logger.info(`Encontrados ${posts.length} posts para processar na transação ${transaction.id}`);
       
       // Verificar quais posts já têm ordens na core_orders para esta transação
       // e garantir que não sejam duplicados

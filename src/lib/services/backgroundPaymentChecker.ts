@@ -123,25 +123,15 @@ export async function processApprovedPayments(): Promise<{ success: boolean; mes
           .eq('transaction_id', transaction.id);
           
         if (posts && posts.length > 0) {
-          // Identificar posts selecionados
-          const selectedPosts = posts.filter(post => {
-            const selected = post.selected;
-            return selected === true || 
-                   selected === 1 || 
-                   selected === '1' || 
-                   selected === 'true' || 
-                   selected === 'yes' || 
-                   selected === 'sim';
-          });
-          
+          // Todos os posts são considerados selecionados por padrão
           transactionPostsDetails.push({
             transactionId: transaction.id,
             totalPosts: posts.length,
-            selectedPosts: selectedPosts.length,
-            hasSelectedPosts: selectedPosts.length > 0
+            selectedPosts: posts.length,  // Todos os posts são considerados selecionados
+            hasSelectedPosts: true  // Se houver posts, eles são considerados selecionados
           });
           
-          console.log(`Transação ${transaction.id}: ${posts.length} posts totais, ${selectedPosts.length} selecionados`);
+          console.log(`Transação ${transaction.id}: ${posts.length} posts totais (todos serão processados)`);
         } else {
           console.log(`Transação ${transaction.id}: Nenhum post associado`);
           transactionPostsDetails.push({
@@ -204,12 +194,12 @@ export async function processApprovedPayments(): Promise<{ success: boolean; mes
           continue;
         }
         
-        // Verificar se tem posts selecionados para essa transação
+        // Verificar se tem posts para essa transação
         const postsDetail = transactionPostsDetails.find(p => p.transactionId === transaction.id);
         
-        if (postsDetail && postsDetail.totalPosts > 0 && !postsDetail.hasSelectedPosts) {
-          console.warn(`⚠️ ATENÇÃO: Transação ${transaction.id} tem ${postsDetail.totalPosts} posts, mas NENHUM selecionado!`);
-          console.log(`Verificar se o usuário realmente não selecionou nenhum post ou se há um problema com a seleção.`);
+        if (postsDetail && postsDetail.totalPosts === 0) {
+          console.warn(`⚠️ ATENÇÃO: Transação ${transaction.id} não tem posts associados!`);
+          console.log(`Verificar se há um problema na criação dos posts para esta transação.`);
         }
         
         console.log(`Processando transação ${transaction.id}...`);
