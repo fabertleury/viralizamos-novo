@@ -210,204 +210,206 @@ export class TransactionProcessor {
         };
       }
       
-      // Se não encontrou posts na tabela, usar a lógica padrão
-      if (!transactionPosts || transactionPosts.length === 0) {
-        this.logger.info(`Nenhum post encontrado na tabela core_transaction_posts_v2, usando dados da transação`);
+      // Se encontrou posts, criar uma ordem para cada post
+      this.logger.info(`Encontrados ${transactionPosts.length} posts na tabela core_transaction_posts_v2`);
+      
+      // Verificar quais posts já têm ordens na core_orders para esta transação
+      // e garantir que não sejam duplicados
+      const { data: existingOrders, error: existingOrdersError } = await this.supabase
+        .from('core_orders')
+        .select('id, metadata, status, target_url')
+        .eq('transaction_id', transaction.id);
+      
+      if (existingOrdersError) {
+        this.logger.error(`Erro ao verificar ordens existentes para transação ${transaction.id}: ${existingOrdersError.message}`);
+      }
+      
+      // Mapear ordens existentes por post_code e url para verificação precisa
+      const existingOrdersMap = new Map();
+      
+      if (existingOrders && existingOrders.length > 0) {
+        this.logger.warn(`🔍 ATENÇÃO: Encontradas ${existingOrders.length} ordens existentes para transação ${transaction.id}`);
         
-        // Extrair a quantidade do metadata da transação
-        const quantity = txDetails.metadata?.quantity || 
+        for (const order of existingOrders) {
+          // Mapear por metadata.post_code
+          if (order.metadata?.post_code) {
+            existingOrdersMap.set(order.metadata.post_code, {
+              orderId: order.id,
+              status: order.status
+            });
+            this.logger.info(`Ordem existente: ${order.id} para post_code ${order.metadata.post_code}`);
+          }
+          
+          // Mapear também por URL
+          if (order.target_url) {
+            existingOrdersMap.set(order.target_url, {
+              orderId: order.id,
+              status: order.status
+            });
+            this.logger.info(`Ordem existente: ${order.id} para URL ${order.target_url}`);
+          }
+        }
+      }
+      
+      // Verificar quais posts devem ser processados (ainda não possuem ordens)
+      const postsToProcess = [];
+      const skippedPosts = [];
+      
+      for (const post of transactionPosts) {
+        // Verificar se o post já tem uma ordem na tabela core_orders
+        const hasOrderByCode = post.post_code && existingOrdersMap.has(post.post_code);
+        
+        // Construir a provável URL do post para verificação
+        let targetUrl = post.post_url;
+        if (!targetUrl && post.post_code) {
+          const isReel = post.post_type === 'reel';
+          targetUrl = isReel
+            ? `https://instagram.com/reel/${post.post_code}/`
+            : `https://instagram.com/p/${post.post_code}/`;
+        }
+        
+        const hasOrderByUrl = targetUrl && existingOrdersMap.has(targetUrl);
+        
+        if (hasOrderByCode || hasOrderByUrl) {
+          const orderInfo = hasOrderByCode 
+            ? existingOrdersMap.get(post.post_code)
+            : existingOrdersMap.get(targetUrl);
+            
+          this.logger.warn(`⏭️ Pulando post ${post.id} (${post.post_code}) - já existe ordem ${orderInfo.orderId} com status '${orderInfo.status}'`);
+          
+          skippedPosts.push({
+            post_id: post.id,
+            post_code: post.post_code,
+            order_id: orderInfo.orderId,
+            order_status: orderInfo.status
+          });
+        } else {
+          postsToProcess.push(post);
+        }
+      }
+      
+      this.logger.info(`Após verificação de duplicidade: ${postsToProcess.length} posts para processar, ${skippedPosts.length} posts pulados`);
+      
+      // Se não houver posts para processar, retornar
+      if (postsToProcess.length === 0) {
+        if (skippedPosts.length > 0) {
+          this.logger.info(`Todos os ${skippedPosts.length} posts já possuem ordens. Nada a fazer.`);
+          
+          // Garantir que a transação seja marcada como processada
+          await this.supabase
+            .from('core_transactions_v2')
+            .update({
+              order_created: true,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', transaction.id);
+            
+          return {
+            status: 'processed',
+            reason: 'Todos os posts já possuem ordens'
+          };
+        }
+        
+        this.logger.warn(`⚠️ IMPORTANTE: Nenhum post válido para processamento na transação ${transaction.id}!`);
+        return {
+          status: 'error',
+          reason: 'Nenhum post válido para processamento',
+          error: 'Transação não possui posts válidos para processamento'
+        };
+      }
+      
+      let ordersCreated = 0;
+      let ordersWithErrors = 0;
+      
+      for (const post of postsToProcess) {
+        // Usar a quantidade específica do post ou do metadata da transação
+        const quantity = post.quantity || 
+                         txDetails.metadata?.quantity || 
                          txDetails.metadata?.service?.quantity || 
                          txDetails.metadata?.service?.quantidade || 
                          txDetails.metadata?.quantidade || 
                          1000; // valor padrão seguro
         
-        this.logger.info(`Quantidade extraída do metadata: ${quantity}`);
+        this.logger.info(`Criando ordem para post ${post.id} (${post.post_code}) com quantidade ${quantity}`);
         
-        // Criar ordem básica para ser processada pelo OrderProcessor
-        const { data: order, error: orderError } = await this.supabase
-          .from('core_orders')
-          .insert({
-            transaction_id: txDetails.id,
-            service_id: txDetails.service_id,
-            provider_id: txDetails.provider_id,
-            post_id: txDetails.post_id,
-            customer_id: txDetails.customer_id,
-            customer_name: txDetails.customer_name,
-            customer_email: txDetails.customer_email,
-            status: 'pending',
-            quantity: quantity,
-            target_username: txDetails.target_username,
-            target_url: txDetails.target_url,
-            metadata: txDetails.metadata || {}
-          })
-          .select()
-          .single();
-          
-        if (orderError) {
-          this.logger.error(`Erro ao criar ordem para transação ${transaction.id}: ${orderError.message}`);
-          return {
-            status: 'error',
-            reason: 'Erro ao criar ordem',
-            error: orderError.message
-          };
+        // Construir URL correta para o post
+        let targetUrl = post.post_url;
+        if (!targetUrl && post.post_code) {
+          // Se não tiver URL mas tiver código, construir URL
+          const isReel = post.post_type === 'reel';
+          targetUrl = isReel
+            ? `https://instagram.com/reel/${post.post_code}/`
+            : `https://instagram.com/p/${post.post_code}/`;
         }
         
-        this.logger.success(`Ordem ${order.id} criada com sucesso para transação ${transaction.id}`);
-      } else {
-        // Se encontrou posts, criar uma ordem para cada post
-        this.logger.info(`Encontrados ${transactionPosts.length} posts na tabela core_transaction_posts_v2`);
-        
-        // Filtrar apenas os posts que foram selecionados pelo usuário
-        // Em vez de filtrar, vamos considerar todos os posts como selecionados
-        // já que esses posts já foram explicitamente adicionados pelo usuário no checkout
-        
-        // Adicionando mensagem de log para debugging
-        this.logger.info(`IMPORTANTE: Considerando todos os ${transactionPosts.length} posts como selecionados para processamento`);
-        
-        // Usar todos os posts disponíveis em vez de apenas os marcados como selecionados
-        const postsToProcess = transactionPosts;
-        
-        // Se não houver posts, retornar erro
-        if (postsToProcess.length === 0) {
-          this.logger.warn(`⚠️ IMPORTANTE: Nenhum post encontrado na transação ${transaction.id}!`);
-          return {
-            status: 'error',
-            reason: 'Nenhum post encontrado',
-            error: 'Transação não possui posts associados para processamento'
-          };
-        }
-        
-        // Rastrear ordens já criadas para não criar duplicatas
-        const existingOrdersForPosts = new Map();
-        
-        // Verificar se já existem ordens para estes posts na transação atual
-        const { data: existingOrders } = await this.supabase
-          .from('core_orders')
-          .select('id, metadata, status')
-          .eq('transaction_id', txDetails.id)
-          .neq('status', 'error');
-          
-        if (existingOrders && existingOrders.length > 0) {
-          this.logger.info(`Encontradas ${existingOrders.length} ordens existentes para a transação ${txDetails.id}`);
-          
-          // Mapear ordens existentes por post_code ou post_id
-          for (const order of existingOrders) {
-            const metadata = order.metadata || {};
-            if (metadata.post_code) {
-              existingOrdersForPosts.set(metadata.post_code, order.id);
-              this.logger.info(`Mapeada ordem existente ${order.id} para post_code ${metadata.post_code}`);
-            }
-            if (metadata.post_id) {
-              existingOrdersForPosts.set(metadata.post_id, order.id);
-              this.logger.info(`Mapeada ordem existente ${order.id} para post_id ${metadata.post_id}`);
-            }
-          }
-        }
-        
-        let ordersCreated = 0;
-        let ordersWithErrors = 0;
-        
-        for (const post of postsToProcess) {
-          // Verificar se já existe uma ordem para este post
-          if (existingOrdersForPosts.has(post.post_code) || existingOrdersForPosts.has(post.id)) {
-            const existingOrderId = existingOrdersForPosts.get(post.post_code) || existingOrdersForPosts.get(post.id);
-            this.logger.warn(`Pulando criação de ordem para post ${post.id} (${post.post_code}) - já existe ordem ${existingOrderId}`);
-            continue; // Pular para o próximo post
-          }
-          
-          // Usar a quantidade específica do post ou do metadata da transação
-          const quantity = post.quantity || 
-                           txDetails.metadata?.quantity || 
-                           txDetails.metadata?.service?.quantity || 
-                           txDetails.metadata?.service?.quantidade || 
-                           txDetails.metadata?.quantidade || 
-                           1000; // valor padrão seguro
-          
-          this.logger.info(`Criando ordem para post ${post.id} (${post.post_code}) com quantidade ${quantity}`);
-          
-          // Construir URL correta para o post
-          let targetUrl = post.post_url;
-          if (!targetUrl && post.post_code) {
-            // Se não tiver URL mas tiver código, construir URL
-            const isReel = post.post_type === 'reel';
-            targetUrl = isReel
-              ? `https://instagram.com/reel/${post.post_code}/`
-              : `https://instagram.com/p/${post.post_code}/`;
-          }
-          
-          try {
-            // Criar ordem para este post específico
-            const { data: order, error: orderError } = await this.supabase
-              .from('core_orders')
-              .insert({
-                transaction_id: txDetails.id,
-                service_id: txDetails.service_id,
-                provider_id: txDetails.provider_id,
-                post_id: null, // Não usar post_id para evitar violação de chave estrangeira
-                customer_id: txDetails.customer_id,
-                customer_name: txDetails.customer_name,
-                customer_email: txDetails.customer_email,
-                status: 'pending',
-                quantity: quantity,
-                target_username: post.username || txDetails.target_username,
-                target_url: targetUrl || txDetails.target_url,
-                metadata: {
-                  ...(txDetails.metadata || {}),
-                  post_code: post.post_code,
-                  post_type: post.post_type,
-                  post_url: post.post_url,
-                  post_id: post.id,
-                  post_source: 'core_transaction_posts_v2'
-                }
-              })
-              .select()
-              .single();
-              
-            if (orderError) {
-              this.logger.error(`Erro ao criar ordem para post ${post.id}: ${orderError.message}`);
-              ordersWithErrors++;
-              // Continuar para o próximo post mesmo se houver erro
-              continue;
-            }
+        try {
+          // Criar ordem para este post específico
+          const { data: order, error: orderError } = await this.supabase
+            .from('core_orders')
+            .insert({
+              transaction_id: txDetails.id,
+              service_id: txDetails.service_id,
+              provider_id: txDetails.provider_id,
+              post_id: null, // Não usar post_id para evitar violação de chave estrangeira
+              customer_id: txDetails.customer_id,
+              customer_name: txDetails.customer_name,
+              customer_email: txDetails.customer_email,
+              status: 'pending',
+              quantity: quantity,
+              target_username: post.username || txDetails.target_username,
+              target_url: targetUrl || txDetails.target_url,
+              metadata: {
+                ...(txDetails.metadata || {}),
+                post_code: post.post_code,
+                post_type: post.post_type,
+                post_url: post.post_url,
+                post_id: post.id,
+                post_source: 'core_transaction_posts_v2'
+              }
+            })
+            .select()
+            .single();
             
-            this.logger.success(`Ordem ${order.id} criada com sucesso para post ${post.id}`);
-            ordersCreated++;
-          } catch (error) {
-            this.logger.error(`Erro ao criar ordem para post ${post.id}: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+          if (orderError) {
+            this.logger.error(`Erro ao criar ordem para post ${post.id}: ${orderError.message}`);
             ordersWithErrors++;
-            // Continuar para o próximo post
+            // Continuar para o próximo post mesmo se houver erro
             continue;
           }
-        }
-        
-        this.logger.info(`Criadas ${ordersCreated} ordens com sucesso. ${ordersWithErrors} ordens com erro.`);
-        
-        // Log de posts que foram pulados por causa de ordens existentes
-        const skippedPosts = postsToProcess.filter(post => 
-          existingOrdersForPosts.has(post.post_code) || existingOrdersForPosts.has(post.id)
-        );
-        
-        if (skippedPosts.length > 0) {
-          this.logger.info(`Pulados ${skippedPosts.length} posts que já tinham ordens existentes.`);
-        }
-        
-        // Se nenhuma ordem foi criada com sucesso, retornar erro
-        if (ordersCreated === 0) {
-          // Se foram pulados todos os posts, considerar um sucesso
-          if (skippedPosts.length === postsToProcess.length) {
-            this.logger.info(`Todos os ${postsToProcess.length} posts já tinham ordens existentes. Nada a fazer.`);
-            return {
-              status: 'processed',
-              reason: 'Todos os posts já tinham ordens existentes'
-            };
-          }
           
+          this.logger.success(`Ordem ${order.id} criada com sucesso para post ${post.id}`);
+          ordersCreated++;
+        } catch (error) {
+          this.logger.error(`Erro ao criar ordem para post ${post.id}: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+          ordersWithErrors++;
+          // Continuar para o próximo post
+          continue;
+        }
+      }
+      
+      this.logger.info(`Criadas ${ordersCreated} ordens com sucesso. ${ordersWithErrors} ordens com erro.`);
+      
+      // Log de posts que foram pulados por causa de ordens existentes
+      if (skippedPosts.length > 0) {
+        this.logger.info(`Pulados ${skippedPosts.length} posts que já tinham ordens existentes.`);
+      }
+      
+      // Se nenhuma ordem foi criada com sucesso, retornar erro
+      if (ordersCreated === 0) {
+        // Se foram pulados todos os posts, considerar um sucesso
+        if (skippedPosts.length === postsToProcess.length) {
+          this.logger.info(`Todos os ${postsToProcess.length} posts já tinham ordens existentes. Nada a fazer.`);
           return {
-            status: 'error',
-            reason: 'Erro ao criar ordens para os posts',
-            error: `Falha ao criar ${ordersWithErrors} ordens para a transação`
+            status: 'processed',
+            reason: 'Todos os posts já tinham ordens existentes'
           };
         }
+        
+        return {
+          status: 'error',
+          reason: 'Erro ao criar ordens para os posts',
+          error: `Falha ao criar ${ordersWithErrors} ordens para a transação`
+        };
       }
       
       // Processar ordens pendentes para envio ao provedor

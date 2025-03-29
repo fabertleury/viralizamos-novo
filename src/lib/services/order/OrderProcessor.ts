@@ -57,49 +57,45 @@ export class OrderProcessor {
   }
   
   /**
-   * Verifica se um pedido já está bloqueado para processamento
+   * Verifica se um post+serviço está bloqueado na tabela core_processing_locks
    * @param postCode Código do post
    * @param serviceId ID do serviço
-   * @returns True se estiver bloqueado, false caso contrário
+   * @returns true se estiver bloqueado, false caso contrário
    */
   private async isOrderLocked(postCode: string, serviceId: string): Promise<boolean> {
-    if (!postCode) return false;
-    
     try {
-      // Criar a chave de bloqueio
+      if (!postCode || !serviceId) {
+        return false; // Se não tiver código ou serviço, permitir o processamento
+      }
+      
       const lockKey = `post_${postCode}_service_${serviceId}`;
       
-      // Verificar se existe um bloqueio ativo na tabela core_processing_locks
       const { data, error } = await this.supabase
         .from('core_processing_locks')
-        .select('id, expires_at')
+        .select('*')
         .eq('lock_key', lockKey)
-        .maybeSingle(); // Usar maybeSingle em vez de single para evitar erro quando não encontra
+        .gt('expires_at', new Date().toISOString()) // Verificar apenas bloqueios não expirados
+        .maybeSingle();
+      
+      if (error) {
+        this.logger.error(`Erro ao verificar bloqueio para post ${postCode}: ${error.message}`);
+        return false; // Em caso de erro, permitir o processamento
+      }
+      
+      // Se encontrou um bloqueio válido (não expirado), retornar true
+      if (data) {
+        const expiresAt = new Date(data.expires_at);
+        const now = new Date();
+        const minutesRemaining = Math.round((expiresAt.getTime() - now.getTime()) / (60 * 1000));
         
-      // Se não tiver dados ou ocorreu erro, consideramos como não bloqueado
-      if (error || !data) {
-        return false;
+        this.logger.warn(`Post ${postCode} bloqueado até ${data.expires_at} (${minutesRemaining} minutos restantes)`);
+        return true;
       }
       
-      // Verificar se o bloqueio expirou
-      const expiresAt = new Date(data.expires_at);
-      const now = new Date();
-      
-      if (expiresAt < now) {
-        // Bloqueio expirado, pode remover
-        await this.supabase
-          .from('core_processing_locks')
-          .delete()
-          .eq('id', data.id);
-          
-        return false;
-      }
-      
-      // Bloqueio ainda válido
-      return true;
+      return false; // Nenhum bloqueio encontrado
     } catch (error) {
-      this.logger.error(`Erro ao verificar bloqueio (considerando não bloqueado): ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
-      return false; // Em caso de erro, permitir processar para não bloquear o fluxo
+      this.logger.error(`Erro ao gerenciar bloqueio para post ${postCode}: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      return false; // Em caso de erro, permitir o processamento (melhor do que impedir tudo)
     }
   }
   
@@ -775,18 +771,31 @@ export class OrderProcessor {
           this.logger.info(`Atualizando pedido ${order.id} com ID externo ${successfulOrder.externalOrderId}`);
           this.logger.info(`Dados do resultado recebido do provedor: ${JSON.stringify(successfulOrder)}`);
           
+          // Verificar se o ID externo é um número ou string
+          let externalId = successfulOrder.externalOrderId;
+          
+          // Adicionar log para verificar o tipo de ID recebido
+          this.logger.info(`Tipo do ID externo recebido: ${typeof externalId}, valor: ${externalId}`);
+          
+          // Converter para string se for um número
+          if (typeof externalId === 'number') {
+            externalId = String(externalId);
+            this.logger.info(`ID externo convertido para string: ${externalId}`);
+          }
+          
           // Atualizar o pedido com o ID externo
           const { error: updateError } = await this.supabase
             .from('core_orders')
             .update({
-              provider_order_id: successfulOrder.externalOrderId,
-              external_order_id: successfulOrder.externalOrderId,
+              provider_order_id: externalId,
+              external_order_id: externalId,
               status: 'processing',
               updated_at: new Date().toISOString(),
               metadata: {
                 ...(order.metadata || {}),
                 provider_response: {
-                  external_order_id: successfulOrder.externalOrderId,
+                  external_order_id: externalId,
+                  raw_response: successfulOrder,
                   processed_at: new Date().toISOString()
                 }
               }
@@ -796,13 +805,13 @@ export class OrderProcessor {
           if (updateError) {
             this.logger.error(`Erro ao atualizar pedido ${order.id}: ${updateError.message}`);
           } else {
-            this.logger.success(`Pedido ${order.id} enviado com sucesso para o provedor. ID externo: ${successfulOrder.externalOrderId}`);
+            this.logger.success(`Pedido ${order.id} enviado com sucesso para o provedor. ID externo: ${externalId}`);
           }
           
           return {
             order_id: order.id,
             success: true,
-            external_order_id: successfulOrder.externalOrderId
+            external_order_id: externalId
           };
         } else {
           // Registrar falha no pedido

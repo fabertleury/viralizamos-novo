@@ -411,10 +411,23 @@ export class ProviderOrderService {
         throw new Error(`Erro do provedor: ${response.data?.error || 'Resposta inválida'}`);
       }
       
-      const externalOrderId = response.data.order || String(response.data.id) || `order-${Date.now()}`;
+      // Logar a resposta completa do provedor para depuração
+      this.logger.info(`Resposta do provedor: ${JSON.stringify(response.data)}`);
       
-      // Construir a URL formatada para o perfil para referência interna
-      const profileUrl = `https://instagram.com/${username}`;
+      // Extrair o ID da ordem com tratamento para diferentes formatos de resposta
+      let externalOrderId;
+      
+      if (response.data.order !== undefined) {
+        externalOrderId = String(response.data.order);
+        this.logger.info(`ID do pedido extraído do campo 'order': ${externalOrderId}`);
+      } else if (response.data.id !== undefined) {
+        externalOrderId = String(response.data.id);
+        this.logger.info(`ID do pedido extraído do campo 'id': ${externalOrderId}`);
+      } else {
+        // Fallback para caso não encontre ID específico
+        externalOrderId = `order-${Date.now()}`;
+        this.logger.warn(`Não foi possível extrair ID do pedido da resposta. Usando valor gerado: ${externalOrderId}`);
+      }
       
       // CORREÇÃO: Tratar IDs vindos da tabela core_transaction_posts_v2
       // Como a tabela posts não existe, vamos armazenar apenas nos metadados
@@ -436,7 +449,7 @@ export class ProviderOrderService {
           status: 'pending',
           quantity: followerQuantity,
           target_username: username,
-          target_url: profileUrl, // Armazenar a URL do perfil para referência
+          target_url: `https://instagram.com/${username}`, // Armazenar a URL do perfil para referência
           metadata: {
             service_type: 'seguidores',
             username: username,
@@ -470,86 +483,113 @@ export class ProviderOrderService {
   }
 
   /**
-   * Verifica se um pedido é duplicado usando várias verificações
-   * @param postCode Código do post
-   * @param serviceId ID do serviço 
-   * @param transactionId ID da transação
-   * @param targetUrl URL alvo do pedido
+   * Verifica se um pedido é duplicado usando diferentes métodos
    * @returns Objeto com informações de duplicação, ou null se não for duplicado
    */
   private async verifyDuplicateOrder(
-    postCode: string, 
-    serviceId: string, 
-    transactionId: string, 
+    postCode: string,
+    serviceId: string,
+    transactionId: string,
     targetUrl: string
-  ) {
-    // 1. Verificar via RPC (procedimento armazenado)
-    const { data: duplicateCheck, error: checkError } = await this.supabase.rpc('check_duplicate_order', {
-      p_transaction_id: transactionId,
-      p_post_code: postCode,
-      p_service_id: serviceId
-    });
-    
-    if (checkError) {
-      this.logger.error(`Erro ao verificar duplicidade via RPC: ${checkError.message}`);
-    } else if (duplicateCheck && duplicateCheck.has_duplicate) {
-      this.logger.warn(`Pedido duplicado detectado via RPC: ${duplicateCheck.message}`);
+  ): Promise<{ method: string; message: string; orderId?: string; externalOrderId?: string } | null> {
+    try {
+      // IMPORTANTE: Para evitar bloqueios desnecessários, verificamos primeiro se este post
+      // está na tabela core_transaction_posts_v2 associado à transação atual
+      // e só bloqueamos duplicação se for outro post da mesma transação ou de outra transação
       
-      return {
-        duplicate: true,
-        method: 'rpc',
-        message: duplicateCheck.message || 'Pedido duplicado detectado',
-        orderId: duplicateCheck.order_id,
-        externalOrderId: duplicateCheck.external_order_id
-      };
-    }
-    
-    // 2. Verificação na tabela core_orders por URL diretamente
-    if (targetUrl) {
-      const { data: duplicateOrders } = await this.supabase
-        .from('core_orders')
-        .select('id, external_order_id, status, provider_order_id')
-        .eq('service_id', serviceId)
-        .eq('target_url', targetUrl)
-        .not('status', 'eq', 'error')
-        .order('created_at', { ascending: false })
-        .limit(1);
+      // Verificar se este post específico pertence à transação atual
+      const { data: transactionPosts, error: postsError } = await this.supabase
+        .from('core_transaction_posts_v2')
+        .select('id, post_code, transaction_id')
+        .eq('transaction_id', transactionId)
+        .eq('post_code', postCode);
+      
+      if (!postsError && transactionPosts && transactionPosts.length > 0) {
+        // Este post pertence legitimamente à transação atual, então não é duplicado
+        this.logger.info(`Post ${postCode} pertence à transação ${transactionId}, permitindo processamento`);
         
-      if (duplicateOrders && duplicateOrders.length > 0) {
-        const duplicateOrder = duplicateOrders[0];
-        this.logger.warn(`Pedido duplicado detectado via URL: ${targetUrl} para serviço ${serviceId} (ID: ${duplicateOrder.id})`);
+        // Agora verificamos se este post específico já foi processado para esta transação
+        const { data: existingOrders, error: ordersError } = await this.supabase
+          .from('core_orders')
+          .select('id, status, external_order_id, provider_order_id')
+          .eq('transaction_id', transactionId)
+          .eq('metadata->post_code', postCode)
+          .eq('service_id', serviceId)
+          .neq('status', 'error')
+          .neq('status', 'skipped');
+          
+        if (!ordersError && existingOrders && existingOrders.length > 0) {
+          const existingOrder = existingOrders[0];
+          
+          // Se este post já tem um pedido para esta transação que não está com erro
+          this.logger.warn(`Post ${postCode} já tem um pedido existente (${existingOrder.id}) para a transação ${transactionId}`);
+          
+          return {
+            method: 'existing_order_same_transaction',
+            message: `Post já possui um pedido existente (${existingOrder.status}) para esta transação`,
+            orderId: existingOrder.id,
+            externalOrderId: existingOrder.external_order_id || existingOrder.provider_order_id
+          };
+        }
+        
+        // Se chegou aqui, o post pertence à transação e não tem pedido existente,
+        // então permitimos o processamento
+        return null;
+      }
+      
+      // As verificações abaixo só acontecem se o post não pertence à transação atual
+      // ou se houve erro ao verificar
+      
+      // Usar a RPC de verificação de duplicação (fallback)
+      const { data: duplicateCheck, error: checkError } = await this.supabase.rpc('check_duplicate_order', {
+        p_post_code: postCode,
+        p_service_id: serviceId,
+        p_transaction_id: transactionId
+      });
+      
+      if (checkError) {
+        this.logger.error(`Erro ao verificar duplicação via RPC: ${checkError.message}`);
+      } else if (duplicateCheck && duplicateCheck.has_duplicate) {
+        this.logger.warn(`Pedido duplicado detectado via RPC: ${duplicateCheck.message}`);
         
         return {
-          duplicate: true,
-          method: 'url',
-          message: `Pedido duplicado: URL ${targetUrl} já processada anteriormente para este serviço`,
-          orderId: duplicateOrder.id,
-          externalOrderId: duplicateOrder.external_order_id || duplicateOrder.provider_order_id
+          method: 'rpc',
+          message: duplicateCheck.message || 'Pedido duplicado detectado',
+          orderId: duplicateCheck.order_id,
+          externalOrderId: duplicateCheck.external_order_id
         };
       }
-    }
-    
-    // 3. Verificar em core_processing_locks
-    const lockKey = `post_${postCode}_service_${serviceId}`;
-    const { data: lockData } = await this.supabase
-      .from('core_processing_locks')
-      .select('*')
-      .eq('lock_key', lockKey)
-      .maybeSingle(); // Usar maybeSingle em vez de single para evitar erro quando não encontra
       
-    if (lockData) {
-      this.logger.warn(`Pedido bloqueado: encontrado bloqueio existente para post ${postCode} e serviço ${serviceId}`);
+      // Verificar pedidos existentes com a mesma URL de destino e serviço
+      // (Apenas para URLs específicas, não perfis)
+      if (targetUrl && (targetUrl.includes('/p/') || targetUrl.includes('/reel/'))) {
+        const { data: duplicateOrders } = await this.supabase
+          .from('core_orders')
+          .select('id, status, external_order_id, provider_order_id, transaction_id')
+          .eq('target_url', targetUrl)
+          .eq('service_id', serviceId)
+          .neq('transaction_id', transactionId) // Ignorar URLs da mesma transação
+          .neq('status', 'error');
+          
+        if (duplicateOrders && duplicateOrders.length > 0) {
+          const duplicateOrder = duplicateOrders[0];
+          this.logger.warn(`Pedido duplicado detectado via URL: ${targetUrl} para serviço ${serviceId} (ID: ${duplicateOrder.id}) de outra transação ${duplicateOrder.transaction_id}`);
+          
+          return {
+            method: 'url',
+            message: `Pedido duplicado: URL ${targetUrl} já processada anteriormente para este serviço`,
+            orderId: duplicateOrder.id,
+            externalOrderId: duplicateOrder.external_order_id || duplicateOrder.provider_order_id
+          };
+        }
+      }
       
-      return {
-        duplicate: true,
-        method: 'lock',
-        message: `Post ${postCode} bloqueado para processamento (já foi processado anteriormente)`,
-        orderId: lockData.order_id
-      };
+      // Nenhuma duplicação encontrada
+      return null;
+    } catch (error) {
+      this.logger.error(`Erro ao verificar duplicação: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      return null; // Em caso de erro, permitir o processamento
     }
-    
-    // Nenhuma duplicação encontrada
-    return null;
   }
 
   /**
@@ -698,7 +738,23 @@ export class ProviderOrderService {
         throw new Error(`Erro do provedor: ${response.data?.error || 'Resposta inválida'}`);
       }
       
-      const externalOrderId = response.data.order || String(response.data.id) || `order-${Date.now()}`;
+      // Logar a resposta completa do provedor para depuração
+      this.logger.info(`Resposta do provedor: ${JSON.stringify(response.data)}`);
+      
+      // Extrair o ID da ordem com tratamento para diferentes formatos de resposta
+      let externalOrderId;
+      
+      if (response.data.order !== undefined) {
+        externalOrderId = String(response.data.order);
+        this.logger.info(`ID do pedido extraído do campo 'order': ${externalOrderId}`);
+      } else if (response.data.id !== undefined) {
+        externalOrderId = String(response.data.id);
+        this.logger.info(`ID do pedido extraído do campo 'id': ${externalOrderId}`);
+      } else {
+        // Fallback para caso não encontre ID específico
+        externalOrderId = `order-${Date.now()}`;
+        this.logger.warn(`Não foi possível extrair ID do pedido da resposta. Usando valor gerado: ${externalOrderId}`);
+      }
       
       // CORREÇÃO: Tratar IDs vindos da tabela core_transaction_posts_v2
       // Como a tabela posts não existe, vamos armazenar apenas nos metadados
@@ -758,7 +814,7 @@ export class ProviderOrderService {
   }
 
   /**
-   * Registra um bloqueio permanente para um post e serviço
+   * Registra um bloqueio temporário para um post e serviço (1 hora de duração)
    * @param postCode Código do post
    * @param serviceId ID do serviço
    * @param orderId ID do pedido que causou o bloqueio
@@ -780,11 +836,11 @@ export class ProviderOrderService {
         return;
       }
       
-      // Calcular data de expiração (1 ano)
+      // Calcular data de expiração (1 hora a partir de agora)
       const expiresAt = new Date();
-      expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+      expiresAt.setHours(expiresAt.getHours() + 1);
       
-      // Registrar bloqueio permanente usando a estrutura correta da tabela
+      // Registrar bloqueio temporário usando a estrutura correta da tabela
       const { error } = await this.supabase
         .from('core_processing_locks')
         .insert({
@@ -799,14 +855,15 @@ export class ProviderOrderService {
           metadata: {
             post_code: postCode,
             service_id: serviceId,
-            reason: 'Pedido processado - bloqueio permanente para evitar duplicação'
+            reason: 'Pedido processado - bloqueio temporário de 1 hora para evitar duplicação acidental',
+            duration: '1 hour'
           }
         });
       
       if (error) {
         this.logger.error(`Erro ao registrar bloqueio: ${error.message}`);
       } else {
-        this.logger.success(`Bloqueio registrado com sucesso para post ${postCode} e serviço ${serviceId}`);
+        this.logger.success(`Bloqueio temporário (1 hora) registrado com sucesso para post ${postCode} e serviço ${serviceId}`);
       }
     } catch (error) {
       this.logger.error(`Erro ao registrar bloqueio para post ${postCode}: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
