@@ -4,6 +4,7 @@ import mercadopago from 'mercadopago';
 import QRCode from 'qrcode';
 import { processTransaction } from '@/lib/transactions/transactionProcessor';
 import { BackgroundPaymentChecker } from '@/lib/services/backgroundPaymentChecker';
+import { TransactionService } from '@/lib/core/payment/transactionService';
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,7 +28,8 @@ export async function POST(request: NextRequest) {
       customer_name, 
       customer_email, 
       customer_phone,
-      checkout_type = 'mostrar-posts' // Valor padrão é 'mostrar-posts', mas pode ser 'apenas-link-usuario' ou outros
+      checkout_type = 'mostrar-posts', // Valor padrão é 'mostrar-posts', mas pode ser 'apenas-link-usuario' ou outros
+      posts = [] // Adicionar suporte para posts enviados diretamente
     } = body;
     
     // Buscar o serviço completo do banco de dados para garantir que temos o provider_id correto
@@ -140,10 +142,46 @@ export async function POST(request: NextRequest) {
     // Obter o usuário atual (se autenticado)
     const { data: { user } } = await supabase.auth.getUser();
     const user_id = user?.id || null;
-
-    // Salvar a transação no banco de dados
-    console.log('Salvando transação no banco de dados...');
-    const { data: transaction, error: transactionError } = await supabase
+    
+    // Criar transação nas tabelas core_transactions_v2 e transactions
+    // Usamos o TransactionService para garantir uma criação transacional
+    const transactionService = new TransactionService();
+    
+    // Primeiro criar a transação principal para evitar violação de chave estrangeira
+    const transactionResult = await transactionService.createTransaction({
+      userId: user_id,
+      serviceId: completeService.id,
+      serviceName: completeService.name,
+      serviceType: serviceData.type || 'social',
+      providerId: completeService.provider_id,
+      serviceQuantity: completeService.quantity,
+      amount: Number(finalAmount),
+      paymentMethod: 'pix',
+      paymentId: result.body.id.toString(),
+      paymentStatus: result.body.status,
+      customerName: customer_name || 'N/A',
+      customerEmail: customer_email || 'N/A',
+      customerPhone: customer_phone || 'N/A',
+      targetUsername: profile_username || 'N/A',
+      targetProfileLink: profile_url || `https://instagram.com/${profile_username}`,
+      actionType: 'payment',
+      paymentQrCode: result.body.point_of_interaction.transaction_data.qr_code,
+      paymentQrCodeBase64: qrCodeBase64,
+      checkoutType: checkout_type,
+      posts: posts
+    });
+    
+    if (!transactionResult.success || !transactionResult.transactionId) {
+      console.error('Erro ao criar transação:', transactionResult.error);
+      return NextResponse.json(
+        { error: `Erro ao criar transação: ${transactionResult.error}` },
+        { status: 500 }
+      );
+    }
+    
+    // Salvar também na tabela antiga para compatibilidade
+    console.log('Salvando transação na tabela antiga para compatibilidade...');
+    const { data: oldTransaction, error: oldTransactionError } = await supabase
       .from('transactions')
       .insert({
         user_id,
@@ -189,42 +227,41 @@ export async function POST(request: NextRequest) {
       })
       .select();
 
-    if (transactionError) {
-      throw transactionError;
+    if (oldTransactionError) {
+      console.error('Erro ao salvar na tabela antiga:', oldTransactionError);
+      // Continuar mesmo se houver erro, pois a transação principal já foi criada
     }
 
     // Se o pagamento foi aprovado, processar a transação
     if (result.body.status === 'approved') {
       try {
         // Processar a transação (criar pedidos)
-        const orders = await processTransaction(transaction[0].id);
+        const orders = await processTransaction(transactionResult.transactionId);
         
         // Se temos pedidos, atualizar a transação com o ID do primeiro pedido
         if (orders && orders.length > 0) {
           const { error: updateOrderIdError } = await supabase
-            .from('transactions')
-            .update({
-              order_created: true,
-              order_id: orders[0].id
-            })
-            .eq('id', transaction[0].id);
-          
-          if (updateOrderIdError) {
-            console.error('Erro ao atualizar order_id na transação:', updateOrderIdError);
-          } else {
-            console.log('Transação atualizada com order_id:', orders[0].id);
-          }
-        } else {
-          // Atualizar apenas a flag order_created
-          const { error: updateOrderCreatedError } = await supabase
-            .from('transactions')
+            .from('core_transactions_v2')
             .update({
               order_created: true
             })
-            .eq('id', transaction[0].id);
+            .eq('id', transactionResult.transactionId);
           
-          if (updateOrderCreatedError) {
-            console.error('Erro ao atualizar flag order_created:', updateOrderCreatedError);
+          if (updateOrderIdError) {
+            console.error('Erro ao atualizar order_created na transação:', updateOrderIdError);
+          } else {
+            console.log('Transação atualizada com order_created=true');
+          }
+          
+          // Atualizar também na tabela antiga se tiver sido criada com sucesso
+          if (oldTransaction && oldTransaction.length > 0) {
+            await supabase
+              .from('transactions')
+              .update({
+                order_created: true,
+                order_id: orders[0].id
+              })
+              .eq('id', oldTransaction[0].id);
           }
         }
       } catch (error) {
@@ -244,12 +281,12 @@ export async function POST(request: NextRequest) {
       paymentId: result.body.id.toString(),
       amount: Number(finalAmount),
       status: result.body.status,
-      transaction_id: transaction?.[0]?.id || null
+      transaction_id: transactionResult.transactionId
     }, { status: 200 });
   } catch (error) {
-    console.error('Error creating payment:', error);
+    console.error('Erro ao criar pagamento com Mercado Pago:', error);
     return NextResponse.json(
-      { error: 'Error creating payment' },
+      { error: 'Falha ao criar pagamento: Erro com o Mercado Pago' },
       { status: 500 }
     );
   }

@@ -1,20 +1,49 @@
 {
-  "order_id": "f05337e3-1fac-41e5-b01b-df1abd740921-post123",
-  "transaction_id": "f05337e3-1fac-41e5-b01b-df1abd740921",
+  "order_id": "pix_123456789",
+  "transaction_id": "abcdef12-3456-7890-abcd-ef1234567890",
   "service_id": "1001",
-  "provider_id": "1",
-  "external_service_id": "1234",
+  "provider_id": "3",
+  "external_service_id": "7890",
   "quantity": 1000,
   "target_url": "https://instagram.com/p/ABC123XYZ/",
   "target_username": "usuario_instagram",
   "metadata": {
-    "post_id": "post123",
-    "post_code": "ABC123XYZ",
-    "post_type": "post",
-    "service_type": "likes",
-    "payment_id": "106707916782",
+    "posts": [
+      {
+        "id": "post1",
+        "code": "ABC123XYZ",
+        "url": "https://instagram.com/p/ABC123XYZ/",
+        "type": "post",
+        "quantity": 500,
+        "username": "usuario_instagram",
+        "service_type": "curtidas",
+        "selected": true,
+        "metadata": {
+          "caption": "Minha primeira foto",
+          "imageUrl": "https://cdn.instagram.com/image.jpg"
+        }
+      },
+      {
+        "id": "post2",
+        "code": "DEF456UVW",
+        "url": "https://instagram.com/p/DEF456UVW/",
+        "type": "post",
+        "quantity": 500,
+        "username": "usuario_instagram",
+        "service_type": "curtidas",
+        "selected": true,
+        "metadata": {
+          "caption": "Minha segunda foto",
+          "imageUrl": "https://cdn.instagram.com/image2.jpg"
+        }
+      }
+    ],
+    "type": "curtidas",
     "customer_email": "cliente@exemplo.com",
-    "customer_name": "Cliente Exemplo"
+    "customer_name": "Cliente Exemplo",
+    "customer_phone": "11999998888",
+    "service_name": "Curtidas Instagram",
+    "service_type": "instagram_likes"
   },
-  "webhook_timestamp": "2023-06-01T12:34:56.789Z"
+  "webhook_timestamp": "2023-07-01T12:00:00.000Z"
 } 

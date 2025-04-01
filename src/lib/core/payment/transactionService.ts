@@ -1,12 +1,22 @@
 import { createClient } from '@/lib/supabase/server';
 import { v4 as uuidv4 } from 'uuid';
 
-/**
- * Serviço dedicado a criação de transações
- */
+export interface Transaction {
+  id: string;
+  user_id?: string;
+  service_id: string;
+  amount: number;
+  status: string;
+  payment_id: string;
+  created_at: string;
+}
+
 export interface CreateTransactionParams {
   userId?: string;
   serviceId: string;
+  serviceName?: string;
+  serviceType?: string;
+  providerId?: string;
   amount: number;
   profile: {
     username: string;
@@ -21,18 +31,29 @@ export interface CreateTransactionParams {
   paymentId: string;
   paymentMethod?: string;
   paymentProvider?: string;
-  qrCode?: string;
-  qrCodeBase64?: string;
+  paymentStatus?: string;
+  paymentQrCode?: string;
+  paymentQrCodeBase64?: string;
+  targetUsername?: string;
+  targetProfileLink?: string;
+  actionType?: string;
+  serviceQuantity?: number;
+  checkoutType?: string;
   posts?: Array<{
     id?: string;
     code?: string;
     url?: string;
     caption?: string;
+    link?: string;
     quantity?: number;
+    selected?: boolean;
   }>;
   quantity?: number;
 }
 
+/**
+ * Serviço responsável por gerenciar transações
+ */
 export class TransactionService {
   private supabase;
 
@@ -41,48 +62,58 @@ export class TransactionService {
   }
 
   /**
-   * Função para verificar se o cliente existe e criá-lo caso necessário
+   * Verifica se um cliente existe ou cria um novo
+   * @param customerId ID do cliente
+   * @param customerName Nome do cliente
+   * @param customerEmail E-mail do cliente 
+   * @param customerPhone Telefone do cliente
+   * @returns true se o cliente existe ou foi criado com sucesso
    */
   async verifyOrCreateCustomer(customerId: string, customerName?: string, customerEmail?: string, customerPhone?: string): Promise<boolean> {
     try {
-      // Verificar se o cliente existe
-      const { data: existingCustomer, error: checkError } = await this.supabase
-        .from('core_customers')
+      // Verificar se o cliente já existe
+      const { data: existingCustomer, error: searchError } = await this.supabase
+        .from('customers')
         .select('id')
         .eq('id', customerId)
         .single();
-      
-      // Se o cliente não existe e temos dados, criar um novo
-      if (checkError && !existingCustomer && (customerName || customerEmail)) {
-        const { error: insertError } = await this.supabase
-          .from('core_customers')
-          .insert({
-            id: customerId,
-            name: customerName || `Cliente ${customerId.substring(0, 8)}`,
-            email: customerEmail,
-            phone: customerPhone,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          });
-        
-        if (insertError) {
-          console.error(`[TransactionService] Erro ao criar cliente ${customerId}:`, insertError);
-          return false;
-        }
-        
-        console.log(`[TransactionService] Cliente ${customerId} criado com sucesso!`);
+
+      if (searchError && searchError.code !== 'PGRST116') {
+        console.error('[TransactionService] Erro ao buscar cliente:', searchError);
+        return false;
+      }
+
+      // Se o cliente já existe, retornar
+      if (existingCustomer) {
         return true;
       }
-      
-      return !checkError;
+
+      // Se não existe, criar um novo cliente
+      const { error: insertError } = await this.supabase
+        .from('customers')
+        .insert({
+          id: customerId,
+          name: customerName || 'Cliente',
+          email: customerEmail || '',
+          phone: customerPhone || ''
+        });
+
+      if (insertError) {
+        console.error('[TransactionService] Erro ao criar cliente:', insertError);
+        return false;
+      }
+
+      return true;
     } catch (error) {
-      console.error(`[TransactionService] Erro ao verificar/criar cliente ${customerId}:`, error);
+      console.error('[TransactionService] Erro ao verificar/criar cliente:', error);
       return false;
     }
   }
 
   /**
-   * Cria uma nova transação no sistema
+   * Cria uma nova transação
+   * @param params Parâmetros para criação da transação
+   * @returns Objeto com o resultado da criação
    */
   async createTransaction(params: CreateTransactionParams): Promise<{
     success: boolean;
@@ -93,122 +124,80 @@ export class TransactionService {
     error?: string;
   }> {
     const {
-      userId = null,
+      userId,
       serviceId,
+      serviceName,
+      serviceType,
+      providerId,
       amount,
-      profile,
-      customer,
+      profile = { username: '' },
+      customer = { email: '', name: '' },
       paymentId,
       paymentMethod = 'pix',
       paymentProvider = 'mercadopago',
-      qrCode = '',
-      qrCodeBase64 = '',
-      posts = [],
-      quantity = 0
+      paymentStatus = 'pending',
+      paymentQrCode,
+      paymentQrCodeBase64,
+      targetUsername,
+      targetProfileLink,
+      actionType = 'payment',
+      serviceQuantity = 0,
+      checkoutType = 'mostrar-posts',
+      posts = []
     } = params;
-    
-    if (!serviceId) {
-      throw new Error('ID do serviço não fornecido');
-    }
-    
-    if (!profile || !profile.username) {
-      throw new Error('Dados do perfil não fornecidos ou incompletos');
-    }
-    
-    if (!customer || !customer.email) {
-      throw new Error('Dados do cliente não fornecidos ou incompletos');
-    }
-    
-    if (!paymentId) {
-      throw new Error('ID do pagamento não fornecido');
-    }
-    
-    // Gerar um ID para a transação
+
+    const effectiveUsername = targetUsername || profile.username;
+    const effectiveProfileLink = targetProfileLink || profile.link || `https://instagram.com/${effectiveUsername}`;
+
+    // Gerar um ID único para a transação
     const transactionId = uuidv4();
     console.log(`[TransactionService] Criando transação ${transactionId} para pagamento ${paymentId}`);
+
+    // Verificar e adicionar provider_id nos metadados
+    console.log(`[TransactionService] Provider ID obtido do serviço: ${providerId}`);
+
+    // Verificar quantidade do serviço
+    let finalQuantity = serviceQuantity;
     
-    // Buscar o provider_id associado ao serviço
-    let providerId = null;
-    try {
-      const { data: serviceData, error: serviceError } = await this.supabase
-        .from('services')
-        .select('provider_id, quantidade')
-        .eq('id', serviceId)
-        .single();
+    // Se temos uma quantidade vinda do serviço, usar essa
+    if (params.quantity) {
+      finalQuantity = params.quantity;
+      console.log(`[TransactionService] Usando quantidade fornecida explicitamente: ${finalQuantity}`);
+    } 
+    // Se não, mas temos posts, calcular a quantidade total dos posts
+    else if (posts.length > 0 && posts.some(post => typeof post.quantity === 'number')) {
+      // Calcular a soma das quantidades de todos os posts
+      const totalFromPosts = posts.reduce((total, post) => {
+        return total + (typeof post.quantity === 'number' ? post.quantity : 0);
+      }, 0);
       
-      if (serviceError) {
-        console.error(`[TransactionService] Erro ao buscar provider_id do serviço ${serviceId}:`, serviceError);
-      } else if (serviceData && serviceData.provider_id) {
-        providerId = serviceData.provider_id;
-        console.log(`[TransactionService] Provider ID obtido do serviço: ${providerId}`);
+      if (totalFromPosts > 0) {
+        finalQuantity = totalFromPosts;
+        console.log(`[TransactionService] Quantidade total calculada dos posts: ${finalQuantity}`);
       }
-      
-      // Se não conseguir obter o provider_id do serviço, buscar um provider padrão
-      if (!providerId) {
-        const { data: defaultProvider, error: providerError } = await this.supabase
-          .from('providers')
-          .select('id')
-          .eq('is_active', true)
-          .order('created_at', { ascending: true })
-          .limit(1)
-          .single();
-        
-        if (!providerError && defaultProvider) {
-          providerId = defaultProvider.id;
-          console.log(`[TransactionService] Provider ID padrão obtido: ${providerId}`);
-        } else {
-          console.error('[TransactionService] Erro ao buscar provider padrão:', providerError);
-        }
-      }
-      
-      // Determinar a quantidade total do serviço
-      const serviceQuantity = serviceData?.quantidade || 0;
-      const totalQuantity = quantity || serviceQuantity;
-      console.log(`[TransactionService] Quantidade total do serviço: ${totalQuantity}`);
-      
-    } catch (error) {
-      console.error('[TransactionService] Erro ao buscar provider_id:', error);
     }
     
-    // Buscar a quantidade do serviço se não fornecida
-    let serviceQuantity = quantity;
-    if (!serviceQuantity) {
-      try {
-        const { data: service, error: serviceError } = await this.supabase
-          .from('services')
-          .select('quantidade')
-          .eq('id', serviceId)
-          .single();
-        
-        if (!serviceError && service) {
-          serviceQuantity = service.quantidade;
-          console.log(`[TransactionService] Quantidade obtida do serviço: ${serviceQuantity}`);
-        }
-      } catch (error) {
-        console.error('[TransactionService] Erro ao buscar quantidade do serviço:', error);
-      }
-    } else {
-      console.log(`[TransactionService] Usando quantidade fornecida explicitamente: ${serviceQuantity}`);
-    }
-    
-    // Criar metadados da transação - formato simplificado sem propriedades que possam gerar conflito
+    // Metadados adicionais da transação
     const transactionMetadata = {
-      profile_username: profile.username,
-      profile_full_name: profile.full_name || '',
-      profile_link: profile.link || `https://instagram.com/${profile.username}`,
-      customer_name: customer.name || '',
-      customer_email: customer.email,
-      customer_phone: customer.phone || '',
+      profile: {
+        username: effectiveUsername,
+        link: effectiveProfileLink
+      },
+      customer: {
+        name: customer.name,
+        email: customer.email,
+        phone: customer.phone || ''
+      },
       payment_id: paymentId,
       payment_provider: paymentProvider,
       payment_method: paymentMethod,
-      payment_qr_code: qrCode,
-      payment_qr_code_base64: qrCodeBase64,
+      payment_qr_code: paymentQrCode,
+      payment_qr_code_base64: paymentQrCodeBase64,
       provider_id: providerId, // Adicionar provider_id nos metadados para referência
       created_at: new Date().toISOString(),
-      quantity: serviceQuantity, // Incluir a quantidade total na transação
+      quantity: finalQuantity, // Incluir a quantidade total na transação
       service: {
-        quantity: serviceQuantity // Adicionar a quantidade do serviço nos metadados
+        quantity: finalQuantity // Adicionar a quantidade do serviço nos metadados
       }
     };
     
@@ -221,7 +210,7 @@ export class TransactionService {
         payment_id: paymentId,
         status: 'pending',
         provider_id: providerId,
-        quantity: serviceQuantity
+        quantity: finalQuantity
       }));
       
       // Inserção direta na tabela nova core_transactions_v2 usando o método insert do Supabase
@@ -238,10 +227,10 @@ export class TransactionService {
           payment_id: paymentId,
           payment_external_reference: paymentId,
           external_id: paymentId,
-          payment_status: 'pending',
+          payment_status: paymentStatus,
           payment_provider: paymentProvider,
-          target_username: profile.username,
-          target_url: profile.link || `https://instagram.com/${profile.username}`,
+          target_username: effectiveUsername,
+          target_url: effectiveProfileLink,
           customer_name: customer.name,
           customer_email: customer.email,
           customer_phone: customer.phone || '',
@@ -249,8 +238,8 @@ export class TransactionService {
           order_created: false,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-          action_type: 'payment_created',
-          quantity: serviceQuantity // Adicionar a quantidade total do serviço
+          action_type: actionType,
+          quantity: finalQuantity // Adicionar a quantidade total do serviço
         })
         .select()
         .single();
@@ -273,7 +262,8 @@ export class TransactionService {
           id: post.id,
           code: post.code,
           quantity: post.quantity,
-          has_quantity: typeof post.quantity === 'number'
+          has_quantity: typeof post.quantity === 'number',
+          selected: post.selected
         })));
         
         // Mapear os posts com suas quantidades específicas
@@ -289,19 +279,20 @@ export class TransactionService {
             return {
               transaction_id: transactionId,
               post_code: post.code || '',
-              post_url: post.url || '',
+              post_url: post.url || post.link || '',
               post_caption: post.caption || '',
-              post_type: post.url?.includes('/reel/') ? 'reel' : 'post',
-              username: profile.username,
-              quantity: post.quantity || serviceQuantity // Usar a quantidade específica ou fallback para quantidade total
+              post_type: (post.url || post.link || '').includes('/reel/') ? 'reel' : 'post',
+              username: effectiveUsername,
+              quantity: post.quantity || finalQuantity, // Usar a quantidade específica ou fallback para quantidade total
+              selected: post.selected === true || post.selected === 'true' || post.selected === 1 || post.selected === '1'
             };
           });
         } else {
           // Se não, calcular a distribuição de quantidades
           console.log('[TransactionService] Calculando distribuição de quantidades');
           const totalPosts = posts.length;
-          const quantityPerPost = Math.floor(serviceQuantity / totalPosts);
-          const remainder = serviceQuantity % totalPosts;
+          const quantityPerPost = Math.floor(finalQuantity / totalPosts);
+          const remainder = finalQuantity % totalPosts;
           
           // Criar um array com as quantidades exatas por post
           const quantitiesByPost = Array(totalPosts).fill(quantityPerPost);
@@ -316,11 +307,12 @@ export class TransactionService {
             return {
               transaction_id: transactionId,
               post_code: post.code || '',
-              post_url: post.url || '',
+              post_url: post.url || post.link || '',
               post_caption: post.caption || '',
-              post_type: post.url?.includes('/reel/') ? 'reel' : 'post',
-              username: profile.username,
-              quantity: quantitiesByPost[index] // Usar a quantidade calculada
+              post_type: (post.url || post.link || '').includes('/reel/') ? 'reel' : 'post',
+              username: effectiveUsername,
+              quantity: quantitiesByPost[index], // Usar a quantidade calculada
+              selected: post.selected === true || post.selected === 'true' || post.selected === 1 || post.selected === '1'
             };
           });
         }
@@ -328,7 +320,8 @@ export class TransactionService {
         // Log para depuração
         console.log('[TransactionService] Posts com quantidades:', postsToInsert.map(p => ({
           post_code: p.post_code,
-          quantity: p.quantity
+          quantity: p.quantity,
+          selected: p.selected
         })));
 
         const { error: postsError } = await this.supabase
@@ -344,19 +337,24 @@ export class TransactionService {
         }
       }
       
-      // Registrar log de criação de transação
-      await this.supabase.from('core_processing_logs').insert({
-        transaction_id: transactionId,
-        level: 'info',
-        message: 'Transação criada com sucesso',
-        metadata: {
-          payment_id: paymentId,
-          amount: amount,
-          posts_count: posts.length,
-          quantity: serviceQuantity,
-          created_at: new Date().toISOString()
-        }
-      });
+      // Tentar registrar o log de criação de transação, mas não falhar se houver erro
+      try {
+        await this.supabase.from('core_processing_logs').insert({
+          transaction_id: transactionId,
+          level: 'info',
+          message: 'Transação criada com sucesso',
+          metadata: {
+            payment_id: paymentId,
+            amount: amount,
+            posts_count: posts.length,
+            quantity: finalQuantity,
+            created_at: new Date().toISOString()
+          }
+        });
+      } catch (logError) {
+        // Apenas logar o erro, mas não falhar a transação por causa disso
+        console.warn('[TransactionService] Erro ao registrar log de transação (ignorando):', logError);
+      }
       
       return {
         success: true,
@@ -365,7 +363,7 @@ export class TransactionService {
           payment_id: paymentId,
           status: 'pending',
           service_id: serviceId,
-          quantity: serviceQuantity
+          quantity: finalQuantity
         },
         transactionId,
         paymentId

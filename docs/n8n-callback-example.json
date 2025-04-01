@@ -1,0 +1,39 @@
+{
+  "order_id": "pix_123456789",
+  "status": "completed",
+  "external_order_id": "provider_order_1234567",
+  "message": "Pedido processado com sucesso",
+  "details": {
+    "provider": "SMMPanel",
+    "provider_response": {
+      "order_id": "provider_order_1234567",
+      "start_count": 500,
+      "status": "Completed",
+      "quantity": 1000,
+      "service_id": "7890",
+      "completed_at": "2023-07-01T14:30:00.000Z"
+    },
+    "posts": [
+      {
+        "id": "post1",
+        "code": "ABC123XYZ",
+        "status": "completed",
+        "quantity": 500,
+        "start_count": 250,
+        "end_count": 750
+      },
+      {
+        "id": "post2",
+        "code": "DEF456UVW",
+        "status": "completed",
+        "quantity": 500,
+        "start_count": 300,
+        "end_count": 800
+      }
+    ],
+    "workflow_id": "n8n_workflow_12345",
+    "execution_id": "n8n_execution_6789",
+    "processing_time_ms": 12500
+  },
+  "callback_timestamp": "2023-07-01T14:35:00.000Z"
+} 
