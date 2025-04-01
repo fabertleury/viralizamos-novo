@@ -113,23 +113,23 @@ export class ProviderOrderService {
           
           if (result.success) {
             this.logger.success(`Pedido para post ${post.code || post.id} enviado com sucesso via n8n`);
-            results.push({
+                results.push({
               success: true,
               externalOrderId: result.external_order_id
             });
           } else {
             this.logger.error(`Erro ao enviar pedido para post ${post.code || post.id} via n8n: ${result.error}`);
-            results.push({
-              success: false,
+                results.push({
+                  success: false,
               error: result.error
             });
-          }
-        } catch (error) {
+              }
+            } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
           this.logger.error(`Erro ao processar post ${post.code || post.id}: ${errorMessage}`);
-          
-          results.push({
-            success: false,
+              
+              results.push({
+                success: false,
             error: errorMessage
           });
         }

@@ -62,11 +62,19 @@ export class N8NIntegrationService {
         webhook_timestamp: new Date().toISOString()
       };
       
+      // Configurar autenticação básica para o N8N
+      const username = 'n8n';
+      const password = this.config.apiKey;
+      const auth = {
+        username,
+        password
+      };
+      
       // Enviar para o webhook do N8N
       const response = await axios.post(webhookUrl, payload, {
+        auth,
         headers: {
-          'Content-Type': 'application/json',
-          'X-API-KEY': this.config.apiKey
+          'Content-Type': 'application/json'
         },
         timeout: 30000 // 30 segundos
       });
@@ -133,6 +141,12 @@ export class N8NIntegrationService {
       if (status) {
         // Atualizar o status da transação no banco de dados
         await this.updateTransactionStatus(orderId, status);
+        
+        // Se o callback incluir external_order_id, atualizar na core_orders
+        const externalOrderId = callbackData.external_order_id as string;
+        if (externalOrderId) {
+          await this.updateOrderExternalId(orderId, externalOrderId, status);
+        }
       }
       
       this.logger.info(`Callback processado com sucesso para o pedido ${orderId}`);
@@ -141,6 +155,94 @@ export class N8NIntegrationService {
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
       this.logger.error(`Erro ao processar callback do N8N: ${errorMessage}`);
       return false;
+    }
+  }
+  
+  /**
+   * Atualiza o ID externo e status na tabela core_orders
+   */
+  private async updateOrderExternalId(orderId: string, externalOrderId: string, status: string): Promise<void> {
+    try {
+      const supabase = createClient();
+      
+      // Encontrar o order_id na tabela core_orders
+      const { data: orders, error: findError } = await supabase
+        .from('core_orders')
+        .select('id')
+        .eq('order_id', orderId);
+      
+      if (findError || !orders || orders.length === 0) {
+        this.logger.warn(`Pedido ${orderId} não encontrado na tabela core_orders. Procurando por payment_id...`);
+        
+        // Tente procurar pelo payment_id
+        const { data: ordersByPayment, error: paymentError } = await supabase
+          .from('core_orders')
+          .select('id')
+          .eq('payment_id', orderId);
+        
+        if (paymentError || !ordersByPayment || ordersByPayment.length === 0) {
+          this.logger.error(`Pedido ${orderId} não encontrado na tabela core_orders.`);
+          return;
+        }
+        
+        // Use o primeiro resultado encontrado pelo payment_id
+        for (const order of ordersByPayment) {
+          await this.updateSingleOrder(order.id, externalOrderId, status);
+        }
+      } else {
+        // Atualizar cada ordem encontrada
+        for (const order of orders) {
+          await this.updateSingleOrder(order.id, externalOrderId, status);
+        }
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      this.logger.error(`Erro ao atualizar ID externo do pedido: ${errorMessage}`);
+    }
+  }
+  
+  /**
+   * Atualiza uma única ordem na tabela core_orders
+   */
+  private async updateSingleOrder(orderId: string, externalOrderId: string, status: string): Promise<void> {
+    try {
+      const supabase = createClient();
+      
+      // Mapear o status para o formato esperado pela tabela core_orders
+      let orderStatus = 'pending';
+      switch (status.toLowerCase()) {
+        case 'completed':
+          orderStatus = 'completed';
+          break;
+        case 'processing':
+          orderStatus = 'processing';
+          break;
+        case 'error':
+          orderStatus = 'error';
+          break;
+        case 'cancelled':
+          orderStatus = 'cancelled';
+          break;
+      }
+      
+      // Atualizar a ordem
+      const { error } = await supabase
+        .from('core_orders')
+        .update({
+          external_id: externalOrderId,
+          status: orderStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+      
+      if (error) {
+        this.logger.error(`Erro ao atualizar pedido ${orderId}: ${error.message}`);
+      } else {
+        this.logger.info(`Pedido ${orderId} atualizado com external_id ${externalOrderId} e status ${orderStatus}`);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      this.logger.error(`Erro ao atualizar ordem individual: ${errorMessage}`);
     }
   }
   
@@ -170,14 +272,54 @@ export class N8NIntegrationService {
         transactionStatus = OrderStatus.PENDING;
     }
     
-    // Atualizar a transação
-    await supabase
-      .from('core_transactions_v2')
-      .update({
-        status: transactionStatus,
-        updated_at: new Date().toISOString()
-      })
-      .eq('payment_id', orderId);
+    try {
+      // Primeiro, tente atualizar pelo payment_id direto
+      const { data: updateResult, error } = await supabase
+        .from('core_transactions_v2')
+        .update({
+          status: transactionStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('payment_id', orderId);
+      
+      if (error) {
+        this.logger.error(`Erro ao atualizar transação por payment_id ${orderId}: ${error.message}`);
+      } else if (updateResult && updateResult.length > 0) {
+        this.logger.info(`Transação com payment_id ${orderId} atualizada para status ${transactionStatus}`);
+        return;
+      }
+      
+      // Se não encontrou pelo payment_id, tente com n8n_order_id
+      const { error: error2 } = await supabase
+        .from('core_transactions_v2')
+        .update({
+          status: transactionStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('n8n_order_id', orderId);
+      
+      if (error2) {
+        this.logger.error(`Erro ao atualizar transação por n8n_order_id ${orderId}: ${error2.message}`);
+      } else {
+        this.logger.info(`Transação com n8n_order_id ${orderId} atualizada para status ${transactionStatus}`);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      this.logger.error(`Erro ao atualizar status da transação: ${errorMessage}`);
+    }
+    
+    // Também atualizar na tabela n8n_order_status
+    try {
+      await supabase.from('n8n_order_status')
+        .upsert({
+          order_id: orderId,
+          status: transactionStatus,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'order_id' });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      this.logger.error(`Erro ao atualizar status na tabela n8n_order_status: ${errorMessage}`);
+    }
   }
   
   /**
@@ -199,7 +341,8 @@ export class N8NIntegrationService {
         created_at: new Date().toISOString()
       });
     } catch (error) {
-      this.logger.error(`Erro ao registrar envio de pedido: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      this.logger.error(`Erro ao registrar envio de pedido: ${errorMessage}`);
     }
   }
   
@@ -222,7 +365,8 @@ export class N8NIntegrationService {
         created_at: new Date().toISOString()
       });
     } catch (error) {
-      this.logger.error(`Erro ao registrar erro de pedido: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      this.logger.error(`Erro ao registrar erro de pedido: ${errorMessage}`);
     }
   }
   
@@ -240,10 +384,12 @@ export class N8NIntegrationService {
         order_id: orderId,
         callback_data: callbackData,
         created_at: new Date().toISOString(),
-        processed: true
+        processed: true,
+        processed_at: new Date().toISOString()
       });
     } catch (error) {
-      this.logger.error(`Erro ao registrar callback: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      this.logger.error(`Erro ao registrar callback: ${errorMessage}`);
     }
   }
 } 
