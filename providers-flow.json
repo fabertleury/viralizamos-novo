@@ -1,0 +1,515 @@
+{
+  "name": "Provedores de Serviços - Viralizamos",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "order",
+        "options": {}
+      },
+      "name": "Webhook - Receber Pedido",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.provider_id }}",
+              "operation": "equal",
+              "value2": "1"
+            }
+          ]
+        }
+      },
+      "name": "Provedor 1?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.provider_id }}",
+              "operation": "equal",
+              "value2": "2"
+            }
+          ]
+        }
+      },
+      "name": "Provedor 2?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        480,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.provider_id }}",
+              "operation": "equal",
+              "value2": "3"
+            }
+          ]
+        }
+      },
+      "name": "Provedor 3?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        480,
+        660
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.provedor1.com/v1/order",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api-key",
+              "value": "={{ $env.PROVEDOR1_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "service",
+              "value": "={{ $json.external_service_id }}"
+            },
+            {
+              "name": "link",
+              "value": "={{ $json.target_url }}"
+            },
+            {
+              "name": "quantity",
+              "value": "={{ $json.quantity }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "API Provedor 1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.provedor2.com/v2/add",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.PROVEDOR2_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "action",
+              "value": "add"
+            },
+            {
+              "name": "service",
+              "value": "={{ $json.external_service_id }}"
+            },
+            {
+              "name": "link",
+              "value": "={{ $json.target_url }}"
+            },
+            {
+              "name": "quantity",
+              "value": "={{ $json.quantity }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "API Provedor 2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        700,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.provedor3.com/orders",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "={{ $env.PROVEDOR3_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "serviceId",
+              "value": "={{ $json.external_service_id }}"
+            },
+            {
+              "name": "targetUrl",
+              "value": "={{ $json.target_url }}"
+            },
+            {
+              "name": "quantity",
+              "value": "={{ $json.quantity }}"
+            },
+            {
+              "name": "username",
+              "value": "={{ $json.target_username }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "API Provedor 3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        700,
+        660
+      ]
+    },
+    {
+      "parameters": {
+        "credentials": "={{ $env.SUPABASE_CREDENTIALS_NAME }}",
+        "operation": "update",
+        "schema": "public",
+        "table": "core_orders",
+        "id": "={{ $json.order_id }}",
+        "updateAllMatches": false,
+        "data": {
+          "provider_order_id": "={{ $json.order_id }}",
+          "external_order_id": "={{ $json.body.order || $json.body.id || $json.body.order_id }}",
+          "status": "processing",
+          "updated_at": "={{ $now }}",
+          "metadata": {
+            "provider_response": "={{ $json.body }}",
+            "processed_at": "={{ $now }}"
+          }
+        }
+      },
+      "name": "Atualizar Pedido - Sucesso",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        960,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "credentials": "={{ $env.SUPABASE_CREDENTIALS_NAME }}",
+        "operation": "update",
+        "schema": "public",
+        "table": "core_orders",
+        "id": "={{ $json.order_id }}",
+        "updateAllMatches": false,
+        "data": {
+          "status": "error",
+          "updated_at": "={{ $now }}",
+          "metadata": {
+            "error": "={{ $json.error || 'Erro ao enviar pedido para o provedor' }}",
+            "error_at": "={{ $now }}"
+          }
+        }
+      },
+      "name": "Atualizar Pedido - Erro",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        960,
+        550
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "mergeAllBinary",
+        "joinFields": {}
+      },
+      "name": "Juntar Respostas",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        840,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.statusCode }}",
+              "operation": "equal",
+              "value2": "200"
+            }
+          ]
+        }
+      },
+      "name": "Sucesso?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        960,
+        450
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.API_CALLBACK_URL }}/api/orders/callback",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.API_CALLBACK_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "order_id",
+              "value": "={{ $json.order_id }}"
+            },
+            {
+              "name": "provider_id",
+              "value": "={{ $json.provider_id }}"
+            },
+            {
+              "name": "external_order_id",
+              "value": "={{ $json.body.order || $json.body.id || $json.body.order_id }}"
+            },
+            {
+              "name": "success",
+              "value": "={{ $json.statusCode === 200 }}"
+            },
+            {
+              "name": "response",
+              "value": "={{ $json.body }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Callback API (Notificar)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        460
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook - Receber Pedido": {
+      "main": [
+        [
+          {
+            "node": "Provedor 1?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Provedor 1?": {
+      "main": [
+        [
+          {
+            "node": "API Provedor 1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Provedor 2?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Provedor 2?": {
+      "main": [
+        [
+          {
+            "node": "API Provedor 2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Provedor 3?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Provedor 3?": {
+      "main": [
+        [
+          {
+            "node": "API Provedor 3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "API Provedor 1": {
+      "main": [
+        [
+          {
+            "node": "Juntar Respostas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Provedor 2": {
+      "main": [
+        [
+          {
+            "node": "Juntar Respostas",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "API Provedor 3": {
+      "main": [
+        [
+          {
+            "node": "Juntar Respostas",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Juntar Respostas": {
+      "main": [
+        [
+          {
+            "node": "Sucesso?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sucesso?": {
+      "main": [
+        [
+          {
+            "node": "Atualizar Pedido - Sucesso",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Atualizar Pedido - Erro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Atualizar Pedido - Sucesso": {
+      "main": [
+        [
+          {
+            "node": "Callback API (Notificar)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Atualizar Pedido - Erro": {
+      "main": [
+        [
+          {
+            "node": "Callback API (Notificar)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "createdAt": "2023-06-01T12:00:00.000Z",
+  "settings": {},
+  "staticData": null,
+  "tags": [
+    {
+      "name": "Viralizamos"
+    },
+    {
+      "name": "Provedores"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2023-06-01T12:00:00.000Z",
+  "versionId": "1234567890abcdef"
+} 

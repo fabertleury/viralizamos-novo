@@ -319,11 +319,11 @@ export class TransactionProcessor {
         // Usar a quantidade específica do post ou do metadata da transação
         const quantity = post.quantity || 
                          txDetails.metadata?.quantity || 
-                         txDetails.metadata?.service?.quantity || 
-                         txDetails.metadata?.service?.quantidade || 
-                         txDetails.metadata?.quantidade || 
-                         1000; // valor padrão seguro
-        
+                       txDetails.metadata?.service?.quantity || 
+                       txDetails.metadata?.service?.quantidade || 
+                       txDetails.metadata?.quantidade || 
+                       1000; // valor padrão seguro
+      
         this.logger.info(`Criando ordem para post ${post.id} (${post.post_code}) com quantidade ${quantity}`);
         
         // Construir URL correta para o post
@@ -338,18 +338,18 @@ export class TransactionProcessor {
         
         try {
           // Criar ordem para este post específico
-          const { data: order, error: orderError } = await this.supabase
-            .from('core_orders')
-            .insert({
-              transaction_id: txDetails.id,
-              service_id: txDetails.service_id,
-              provider_id: txDetails.provider_id,
+      const { data: order, error: orderError } = await this.supabase
+        .from('core_orders')
+        .insert({
+          transaction_id: txDetails.id,
+          service_id: txDetails.service_id,
+          provider_id: txDetails.provider_id,
               post_id: null, // Não usar post_id para evitar violação de chave estrangeira
-              customer_id: txDetails.customer_id,
-              customer_name: txDetails.customer_name,
-              customer_email: txDetails.customer_email,
-              status: 'pending',
-              quantity: quantity,
+          customer_id: txDetails.customer_id,
+          customer_name: txDetails.customer_name,
+          customer_email: txDetails.customer_email,
+          status: 'pending',
+          quantity: quantity,
               target_username: post.username || txDetails.target_username,
               target_url: targetUrl || txDetails.target_url,
               metadata: {
@@ -360,11 +360,11 @@ export class TransactionProcessor {
                 post_id: post.id,
                 post_source: 'core_transaction_posts_v2'
               }
-            })
-            .select()
-            .single();
-            
-          if (orderError) {
+        })
+        .select()
+        .single();
+        
+      if (orderError) {
             this.logger.error(`Erro ao criar ordem para post ${post.id}: ${orderError.message}`);
             ordersWithErrors++;
             // Continuar para o próximo post mesmo se houver erro

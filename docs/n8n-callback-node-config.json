@@ -1,0 +1,56 @@
+{
+  "name": "HTTP Request",
+  "type": "n8n-nodes-base.httpRequest",
+  "typeVersion": 1,
+  "position": [
+    980,
+    300
+  ],
+  "parameters": {
+    "authentication": "none",
+    "url": "=https://viralizamos.com.br/api/callback/order",
+    "method": "POST",
+    "sendHeaders": true,
+    "headerParameters": {
+      "parameters": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "X-CALLBACK-SECRET",
+          "value": "viraliza_n8n_callback_2024"
+        }
+      ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={\n  \"order_id\": {{$node[\"Webhook\"].json[\"body\"][\"order_id\"]}},\n  \"external_order_id\": {{$node[\"Provedor API\"].json[\"order\"]}},\n  \"status\": \"processing\",\n  \"error\": null,\n  \"metadata\": {\n    \"provider_response\": \"Pedido recebido com sucesso pelo provedor\",\n    \"estimated_time\": \"24h\",\n    \"provider_name\": {{$node[\"Webhook\"].json[\"body\"][\"provider_id\"]}},\n    \"processing_details\": {{$node[\"Provedor API\"].json[\"message\"]}}\n  }\n}",
+    "options": {
+      "redirect": {
+        "redirect": {
+          "followRedirects": true,
+          "maxRedirects": 5
+        }
+      },
+      "response": {
+        "response": {
+          "fullResponse": true,
+          "responseFormat": "json"
+        }
+      },
+      "retry": {
+        "retry": {
+          "maxRetries": 3,
+          "retryDelay": 3000,
+          "retryOnResponseCodes": [
+            500,
+            502,
+            503,
+            504
+          ]
+        }
+      }
+    }
+  }
+} 

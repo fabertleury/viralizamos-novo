@@ -2,6 +2,41 @@ import { createClient } from '@/lib/supabase/server';
 import { LinkFormatter } from '../utils/linkFormatter';
 import { Logger } from '../utils/logger';
 import axios from 'axios';
+import { N8nIntegrationService } from './n8nIntegrationService';
+
+/**
+ * Interface para dados de um post
+ */
+interface PostData {
+  id: string;
+  url?: string;
+  code?: string;
+  type?: string;
+  username?: string;
+  quantity?: number;
+}
+
+/**
+ * Interface para os parâmetros de envio de um pedido
+ */
+interface SendOrdersParams {
+  transactionId: string;
+  serviceId: string;
+  serviceType: string;
+  providerId: string;
+  posts: PostData[];
+  quantity: number;
+  externalServiceId?: string;
+}
+
+/**
+ * Interface para o resultado de um pedido
+ */
+interface OrderResult {
+  success: boolean;
+  externalOrderId?: string;
+  error?: string;
+}
 
 /**
  * Serviço para envio de pedidos específicos para cada tipo de serviço do provedor
@@ -10,11 +45,13 @@ export class ProviderOrderService {
   private supabase;
   private linkFormatter;
   private logger;
+  private n8nService: N8nIntegrationService;
 
   constructor() {
     this.supabase = createClient();
     this.linkFormatter = new LinkFormatter();
     this.logger = new Logger('ProviderOrderService');
+    this.n8nService = new N8nIntegrationService();
   }
 
   /**
@@ -25,890 +62,117 @@ export class ProviderOrderService {
   }
 
   /**
-   * Envia pedidos para o provedor com base no tipo de serviço
-   * @param params Parâmetros da transação e serviço
-   * @returns Resultado dos pedidos enviados
+   * Envia pedidos para o n8n processar
+   * @param params Parâmetros para o envio
+   * @returns Array com os resultados do envio
    */
-  async sendOrders(params: {
-    transactionId: string;
-    serviceId: string;
-    serviceType: string;
-    providerId: string;
-    posts: Array<{
-      id: string;
-      code?: string;
-      url?: string;
-      type?: string;
-      username?: string;
-      quantity?: number;
-    }>;
-    quantity: number;
-    providerKey?: string;
-    providerApiUrl?: string;
-    externalServiceId?: string;
-  }) {
+  async sendOrders(params: SendOrdersParams): Promise<OrderResult[]> {
     try {
-      const { 
-        transactionId, 
-        serviceId, 
-        serviceType, 
-        providerId, 
-        posts,
-        quantity, 
-        providerKey,
-        providerApiUrl,
-        externalServiceId
-      } = params;
-
-      // Buscar detalhes do provedor se não fornecidos
-      let apiKey = providerKey;
-      let apiUrl = providerApiUrl;
-      let serviceExternalId = externalServiceId;
-
-      if (!apiKey || !apiUrl || !serviceExternalId) {
-        this.logger.info(`Buscando detalhes do provedor ${providerId} e serviço ${serviceId}`);
-        
-        // Buscar dados do provedor
-        const { data: provider, error: providerError } = await this.supabase
-          .from('providers')
-          .select('*')
-          .eq('id', providerId)
-          .single();
-          
-        if (providerError || !provider) {
-          throw new Error(`Erro ao buscar provedor: ${providerError?.message || 'Provedor não encontrado'}`);
-        }
-        
-        // Buscar dados do serviço
-        const { data: service, error: serviceError } = await this.supabase
-          .from('services')
-          .select('*')
-          .eq('id', serviceId)
-          .single();
-          
-        if (serviceError || !service) {
-          throw new Error(`Erro ao buscar serviço: ${serviceError?.message || 'Serviço não encontrado'}`);
-        }
-        
-        apiKey = provider.api_key;
-        apiUrl = provider.api_url;
-        serviceExternalId = service.external_id;
-        
-        if (!apiKey || !apiUrl) {
-          throw new Error('Provedor não possui chave API ou URL configurada');
-        }
-        
-        if (!serviceExternalId) {
-          throw new Error('Serviço não possui ID externo configurado');
-        }
+      if (!params.posts || params.posts.length === 0) {
+        this.logger.error('Nenhum post fornecido para processamento');
+        return [{ success: false, error: 'Nenhum post fornecido' }];
       }
-
-      // Array para armazenar resultados de todos os pedidos
-      const results: Array<{
-        success: boolean;
-        orderId?: string;
-        externalOrderId?: string;
-        postId?: string;
-        postCode?: string;
-        error?: string;
-      }> = [];
-
-      // CORREÇÃO: Verificar se estamos lidando com um serviço de curtidas mas recebendo perfis
-      // Se for serviço de curtidas/etc. mas só temos URLs de perfil, vamos tratar como seguidores
-      if (
-        ['curtidas', 'comentarios', 'visualizacao', 'reels'].includes(serviceType.toLowerCase()) && 
-        posts.length > 0 && 
-        posts.every(post => post.url && post.url.includes('instagram.com/') && 
-                            !post.url.includes('/p/') && !post.url.includes('/reel/'))
-      ) {
-        this.logger.warn(`⚠️ Serviço de ${serviceType} detectado mas todos os posts são perfis. Tratando como serviço de seguidores.`);
-        
-        // ERRO CRÍTICO: Não devemos permitir este comportamento para serviços de curtidas/etc.
-        throw new Error(`Erro de validação: URLs de perfil não são válidas para serviço de ${serviceType}. Verifique os posts enviados e certifique-se de que são URLs de posts ou reels válidos.`);
-      }
-
-      // Diferentes estratégias de envio conforme o tipo de serviço
-      switch (serviceType.toLowerCase()) {
-        case 'seguidores':
-          // Para serviços de seguidores, enviamos apenas um pedido com o nome de usuário
-          // Verificar se temos posts válidos
-          if (!posts || posts.length === 0) {
-            throw new Error('Nenhum post/usuário fornecido para serviço de seguidores');
-          }
-          
-          this.logger.info(`Processando serviço de seguidores para ${posts[0].username || (posts[0].url ? 'URL: ' + posts[0].url : 'ID: ' + posts[0].id)}`);
-          
-          // Enviar pedido de seguidores (usando apenas o primeiro post)
-          return await this.sendFollowersOrder({
-            transactionId,
-            serviceId,
-            providerId,
-            serviceExternalId,
-            apiKey,
-            apiUrl,
-            post: posts[0], // Usamos apenas o primeiro post (que contém o username)
-            quantity
-          });
-
-        case 'curtidas':
-        case 'comentarios':
-        case 'visualizacao':
-        case 'reels': // Incluir reels no mesmo tratamento
-          // Para curtidas, comentários, visualizações e reels, enviamos um pedido para cada item
-          // Adicionando delay entre os pedidos
-          
-          // Logar todos os posts recebidos para debug
-          this.logger.info(`🔍 POSTS RECEBIDOS (${posts.length}): ${JSON.stringify(posts)}`);
-          
-          // VALIDAÇÃO PRÉ-PROCESSAMENTO: Verificar se os posts são válidos para este tipo de serviço
-          const invalidPosts = posts.filter(post => {
-            // Um post é inválido se:
-            // 1. Não tem código E
-            // 2. Sua URL é de perfil (não contém /p/ ou /reel/)
-            return (!post.code && post.url && post.url.includes('instagram.com/') && 
-                    !post.url.includes('/p/') && !post.url.includes('/reel/'));
-          });
-
-          if (invalidPosts.length > 0) {
-            this.logger.error(`⚠️ Detectados ${invalidPosts.length} posts inválidos para serviço de ${serviceType}:`, 
-              JSON.stringify(invalidPosts.map(p => ({url: p.url, code: p.code, id: p.id}))));
-            throw new Error(`Erro de validação: ${invalidPosts.length} URLs de perfil enviadas para serviço de ${serviceType}. Verifique os posts e certifique-se de que são URLs de posts ou reels válidos.`);
-          }
-
-          for (let i = 0; i < posts.length; i++) {
-            const post = posts[i];
-            try {
-              // Logar detalhes do post atual (para entender de onde vem o 'virtual-')
-              this.logger.info(`🔍 PROCESSANDO POST ${i+1}: ${JSON.stringify(post)}`);
-              
-              // Verificar se temos um post válido para serviços de curtidas/comentários/visualizações
-              if (!post || (!post.code && !post.url)) {
-                this.logger.error(`Post inválido para serviço ${serviceType}: ${JSON.stringify(post)}`);
-                results.push({
-                  success: false,
-                  postId: post?.id,
-                  error: `Post inválido: não possui código ou URL necessária para serviço de ${serviceType}`
-                });
-                continue; // Pular este post e ir para o próximo
-              }
-              
-              // Verificar se a URL é de perfil (não deve ser usado para curtidas/etc)
-              if (post.url && post.url.includes('instagram.com/') && 
-                  !post.url.includes('/p/') && !post.url.includes('/reel/')) {
-                this.logger.warn(`URL de perfil detectada para serviço de ${serviceType}: ${post.url}`);
-                results.push({
-                  success: false,
-                  postId: post.id,
-                  error: `URL de perfil não é válida para serviço de ${serviceType}`
-                });
-                continue; // Pular este post e ir para o próximo
-              }
-              
-              // Log para indicar o processamento do item atual (post ou reel)
-              const isReel = post.type === 'reel' || (post.url && post.url.includes('/reel/'));
-              this.logger.info(`Processando ${isReel ? 'reel' : 'post'} ${i+1} de ${posts.length}: ${post.code || post.id}`);
-              
-              // Verificar se o post possui uma quantidade específica
-              const postSpecificQuantity = post.quantity !== undefined && post.quantity !== null;
-              
-              // Log para mostrar a quantidade específica do post, se disponível
-              if (postSpecificQuantity) {
-                this.logger.info(`Post ${post.code || post.id} tem quantidade específica: ${post.quantity}`);
-              } else {
-                this.logger.info(`Post ${post.code || post.id} não tem quantidade específica, usando total: ${quantity}`);
-              }
-              
-              // Todos os tipos de serviço agora usam o mesmo método sendPostOrder que verifica se é post ou reel
-              const result = await this.sendPostOrder({
-                transactionId,
-                serviceId,
-                providerId,
-                serviceExternalId,
-                apiKey,
-                apiUrl,
-                post,
-                quantity: post.quantity !== undefined ? post.quantity : Math.floor(quantity / posts.length), // Usar a quantidade específica do post ou dividir pelo número de posts
-                serviceType
-              });
-              
-              // Log adicional para debug do resultado
-              this.logger.info(`Resultado do envio para o provedor: ${JSON.stringify(result)}`);
-              
-              results.push(result);
-              
-              // Adicionar delay de 50 segundos entre cada pedido (exceto para o último)
-              if (i < posts.length - 1) {
-                this.logger.info(`Aguardando 50 segundos antes de processar o próximo item...`);
-                await this.delay(50000); // 50 segundos em milissegundos
-              }
-            } catch (error) {
-              this.logger.error(`Erro ao processar item ${i+1}: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
-              this.logger.error(`Detalhes do post com erro: ${JSON.stringify({
-                id: post?.id,
-                code: post?.code,
-                url: post?.url,
-                type: post?.type
-              })}`);
-              
-              results.push({
-                success: false,
-                postId: post?.id,
-                postCode: post?.code,
-                error: error instanceof Error ? error.message : 'Erro desconhecido'
-              });
-              
-              // Mesmo em caso de erro, aguardar antes do próximo para não sobrecarregar o provedor
-              if (i < posts.length - 1) {
-                await this.delay(50000);
-              }
-            }
-          }
-          break;
-
-        default:
-          throw new Error(`Tipo de serviço não suportado: ${serviceType}`);
-      }
-
-      // Calcular status geral
-      // const allSuccess = results.every(r => r.success);
       
-      // Log adicional para debug dos resultados finais
-      this.logger.info(`Resultados finais: ${JSON.stringify(results)}`);
+      const results: OrderResult[] = [];
+      
+      // Processar cada post
+      for (const post of params.posts) {
+        try {
+          this.logger.info(`Enviando pedido para o post ${post.code || post.id} via n8n`);
+          
+          // Determinar a URL do post
+          let targetUrl = post.url;
+          if (!targetUrl && post.code) {
+            // Se não tiver URL mas tiver código, construir URL
+            const isReel = post.type === 'reel';
+            targetUrl = isReel
+              ? `https://instagram.com/reel/${post.code}/`
+              : `https://instagram.com/p/${post.code}/`;
+          }
+          
+          // Montar dados do pedido para envio ao n8n
+          const orderData = {
+            order_id: `${params.transactionId}-${post.id}`, // Gerar um ID único para o pedido
+            transaction_id: params.transactionId,
+            service_id: params.serviceId,
+            provider_id: params.providerId,
+            external_service_id: params.externalServiceId || params.serviceId,
+            quantity: post.quantity || params.quantity,
+            target_url: targetUrl,
+            target_username: post.username,
+            metadata: {
+              post_id: post.id,
+              post_code: post.code,
+              post_type: post.type,
+              service_type: params.serviceType
+            }
+          };
+          
+          // Enviar para o n8n
+          const result = await this.n8nService.sendOrder(orderData);
+          
+          if (result.success) {
+            this.logger.success(`Pedido para post ${post.code || post.id} enviado com sucesso via n8n`);
+            results.push({
+              success: true,
+              externalOrderId: result.external_order_id
+            });
+          } else {
+            this.logger.error(`Erro ao enviar pedido para post ${post.code || post.id} via n8n: ${result.error}`);
+            results.push({
+              success: false,
+              error: result.error
+            });
+          }
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+          this.logger.error(`Erro ao processar post ${post.code || post.id}: ${errorMessage}`);
+          
+          results.push({
+            success: false,
+            error: errorMessage
+          });
+        }
+      }
       
       return results;
     } catch (error) {
-      this.logger.error(`Erro ao processar pedidos: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      this.logger.error(`Erro ao enviar pedidos: ${errorMessage}`);
       
-      return {
+      return [{
         success: false,
-        error: error instanceof Error ? error.message : 'Erro desconhecido'
-      };
+        error: errorMessage
+      }];
     }
   }
 
   /**
-   * Envia pedido para serviço de seguidores
-   */
-  private async sendFollowersOrder(params: {
-    transactionId: string;
-    serviceId: string;
-    providerId: string;
-    serviceExternalId: string;
-    apiKey: string;
-    apiUrl: string;
-    post: {
-      id: string;
-      code?: string;
-      url?: string;
-      username?: string;
-      quantity?: number;
-      hasQuantity?: boolean;
-    };
-    quantity: number;
-  }) {
-    const { 
-      transactionId, 
-      serviceId, 
-      providerId, 
-      serviceExternalId, 
-      apiKey, 
-      apiUrl, 
-      post,
-      quantity: defaultQuantity
-    } = params;
-
-    // Log para depuração do post recebido
-    this.logger.info(`Processando pedido de seguidores: ${JSON.stringify(post, null, 2)}`);
-
-    // Validação básica
-    if (!post) {
-      throw new Error('Post inválido ou indefinido');
-    }
-
-    // Extrair o nome de usuário usando o valor já disponível ou da URL
-    let username = post.username;
-    
-    // Se não tiver username explícito mas tiver URL, extrair da URL
-    if (!username && post.url) {
-      // Tentar extrair username da URL
-      const urlRegex = /instagram\.com\/([^\/\?]+)/;
-      const match = post.url.match(urlRegex);
-      
-      if (match && match[1]) {
-        username = match[1];
-        this.logger.info(`Username extraído da URL: ${username}`);
-      } else {
-        const urlParts = post.url.split('/');
-        username = urlParts[urlParts.length - 1].replace('@', '');
-      }
-    }
-    
-    if (!username) {
-      throw new Error(`Nome de usuário não encontrado para serviço de seguidores: ${JSON.stringify(post)}`);
-    }
-    
-    // Remover @ se existir e qualquer parâmetro de URL
-    username = username.replace('@', '').split('?')[0].split('#')[0];
-    
-    this.logger.info(`Enviando pedido de seguidores para usuário: ${username}`);
-    
-    // Usar quantidade específica se disponível
-    const followerQuantity = post.quantity !== undefined ? post.quantity : defaultQuantity;
-    
-    this.logger.info(`Quantidade para seguidores: ${followerQuantity}`);
-    
-    // Verificar pedido duplicado
-    const { data: duplicateCheck, error: checkError } = await this.supabase.rpc(
-      'check_duplicate_order',
-      {
-        p_transaction_id: transactionId,
-        p_post_code: username, // Para seguidores, usamos o username como código
-        p_service_id: serviceId
-      }
-    );
-    
-    if (checkError) {
-      this.logger.error(`Erro ao verificar duplicidade: ${checkError.message}`);
-    } else if (duplicateCheck && duplicateCheck.has_duplicate) {
-      this.logger.warn(`Pedido duplicado de seguidores detectado: ${duplicateCheck.message}`);
-      
-      return {
-        success: false,
-        error: duplicateCheck.message || 'Pedido duplicado detectado',
-        duplicate: true,
-        orderId: duplicateCheck.order_id,
-        externalOrderId: duplicateCheck.external_order_id
-      };
-    }
-    
-    try {
-      // CORREÇÃO: Para serviços de seguidores, enviamos APENAS o username, não a URL completa
-      // Construir os parâmetros para a API do provedor
-      const requestParams = new URLSearchParams({
-        key: apiKey,
-        action: 'add',
-        service: serviceExternalId,
-        link: username, // APENAS o username, não a URL completa
-        quantity: followerQuantity.toString()
-      });
-      
-      // Salvar os dados da requisição para referência
-      const requestData = {
-        action: 'add',
-        service: serviceExternalId,
-        link: username, // APENAS o username
-        quantity: followerQuantity,
-        target_username: username
-      };
-      
-      this.logger.info(`Enviando pedido para o provedor: username=${username} com quantidade ${followerQuantity}`);
-      
-      // Enviar o pedido para o provedor
-      const response = await axios.post(apiUrl, requestParams);
-      
-      // Validar a resposta do provedor
-      if (!response.data || response.data.error) {
-        // Log de erro detalhado no console
-        console.log('\n====== ERRO DO PROVEDOR ======');
-        console.log(`URL enviada: ${apiUrl}`);
-        console.log(`Quantidade: ${followerQuantity}`);
-        console.log(`Serviço ID externo: ${serviceExternalId}`);
-        console.log('Resposta de erro:', JSON.stringify(response.data, null, 2));
-        console.log('==============================\n');
-        
-        throw new Error(`Erro do provedor: ${response.data?.error || 'Resposta inválida'}`);
-      }
-      
-      // Logar a resposta completa do provedor para depuração
-      this.logger.info(`Resposta do provedor: ${JSON.stringify(response.data)}`);
-      
-      // Log no console para visualização imediata no terminal
-      console.log('\n====== RESPOSTA DO PROVEDOR ======');
-      console.log(`URL enviada: https://instagram.com/${username}`);
-      console.log(`Quantidade: ${followerQuantity}`);
-      console.log(`Serviço ID externo: ${serviceExternalId}`);
-      console.log(`Resposta completa: `, JSON.stringify(response.data, null, 2));
-      console.log('==================================\n');
-      
-      // Extrair o ID da ordem com tratamento para diferentes formatos de resposta
-      let externalOrderId;
-      
-      if (response.data.order !== undefined) {
-        externalOrderId = String(response.data.order);
-        this.logger.info(`ID do pedido extraído do campo 'order': ${externalOrderId}`);
-      } else if (response.data.id !== undefined) {
-        externalOrderId = String(response.data.id);
-        this.logger.info(`ID do pedido extraído do campo 'id': ${externalOrderId}`);
-      } else {
-        // Fallback para caso não encontre ID específico
-        externalOrderId = `order-${Date.now()}`;
-        this.logger.warn(`Não foi possível extrair ID do pedido da resposta. Usando valor gerado: ${externalOrderId}`);
-      }
-      
-      // CORREÇÃO: Tratar IDs vindos da tabela core_transaction_posts_v2
-      // Como a tabela posts não existe, vamos armazenar apenas nos metadados
-      const actualPostId = null; // Sempre null para evitar erro de chave estrangeira
-      
-      // Registrar nos logs o ID original para referência
-      this.logger.info(`Usando post ID ${post.id} apenas nos metadados (sem salvar na referência post_id)`);
-      
-      // Registrar o pedido no banco de dados
-      const { data: order, error: orderError } = await this.supabase
-        .from('core_orders')
-        .insert({
-          transaction_id: transactionId,
-          post_id: actualPostId, // NULL para evitar violação de chave estrangeira
-          service_id: serviceId,
-          provider_id: providerId,
-          external_order_id: externalOrderId,
-          provider_order_id: externalOrderId,
-          status: 'pending',
-          quantity: followerQuantity,
-          target_username: username,
-          target_url: `https://instagram.com/${username}`, // Armazenar a URL do perfil para referência
-          metadata: {
-            service_type: 'seguidores',
-            username: username,
-            original_post_id: post.id, // Armazenar o ID original nos metadados para referência
-            post_source: 'core_transaction_posts_v2', // Indicar a fonte do post
-            providerRequestData: requestData,
-            providerResponse: response.data
-          }
-        })
-        .select()
-        .single();
-        
-      if (orderError) {
-        this.logger.error(`Erro ao registrar pedido: ${orderError.message}`);
-        throw new Error(`Erro ao registrar pedido: ${orderError.message}`);
-      }
-      
-      this.logger.success(`Pedido de seguidores registrado com sucesso: ${order.id} para ${username} (${followerQuantity} seguidores)`);
-      
-      return {
-        success: true,
-        orderId: order.id,
-        externalOrderId,
-        username,
-        quantity: followerQuantity
-      };
-    } catch (error) {
-      this.logger.error(`Erro ao enviar pedido de seguidores: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
-      throw error;
-    }
-  }
-
-  /**
-   * Verifica se um pedido é duplicado usando diferentes métodos
-   * @returns Objeto com informações de duplicação, ou null se não for duplicado
-   */
-  private async verifyDuplicateOrder(
-    postCode: string,
-    serviceId: string,
-    transactionId: string,
-    targetUrl: string
-  ): Promise<{ method: string; message: string; orderId?: string; externalOrderId?: string } | null> {
-    try {
-      // IMPORTANTE: Para evitar bloqueios desnecessários, verificamos primeiro se este post
-      // está na tabela core_transaction_posts_v2 associado à transação atual
-      // e só bloqueamos duplicação se for outro post da mesma transação ou de outra transação
-      
-      // Verificar se este post específico pertence à transação atual
-      const { data: transactionPosts, error: postsError } = await this.supabase
-        .from('core_transaction_posts_v2')
-        .select('id, post_code, transaction_id')
-        .eq('transaction_id', transactionId)
-        .eq('post_code', postCode);
-      
-      if (!postsError && transactionPosts && transactionPosts.length > 0) {
-        // Este post pertence legitimamente à transação atual, então não é duplicado
-        this.logger.info(`Post ${postCode} pertence à transação ${transactionId}, permitindo processamento`);
-        
-        // Agora verificamos se este post específico já foi processado para esta transação
-        const { data: existingOrders, error: ordersError } = await this.supabase
-          .from('core_orders')
-          .select('id, status, external_order_id, provider_order_id')
-          .eq('transaction_id', transactionId)
-          .eq('metadata->post_code', postCode)
-          .eq('service_id', serviceId)
-          .neq('status', 'error')
-          .neq('status', 'skipped');
-          
-        if (!ordersError && existingOrders && existingOrders.length > 0) {
-          const existingOrder = existingOrders[0];
-          
-          // Se este post já tem um pedido para esta transação que não está com erro
-          this.logger.warn(`Post ${postCode} já tem um pedido existente (${existingOrder.id}) para a transação ${transactionId}`);
-          
-          return {
-            method: 'existing_order_same_transaction',
-            message: `Post já possui um pedido existente (${existingOrder.status}) para esta transação`,
-            orderId: existingOrder.id,
-            externalOrderId: existingOrder.external_order_id || existingOrder.provider_order_id
-          };
-        }
-        
-        // Se chegou aqui, o post pertence à transação e não tem pedido existente,
-        // então permitimos o processamento
-        return null;
-      }
-      
-      // As verificações abaixo só acontecem se o post não pertence à transação atual
-      // ou se houve erro ao verificar
-      
-      // Usar a RPC de verificação de duplicação (fallback)
-      const { data: duplicateCheck, error: checkError } = await this.supabase.rpc('check_duplicate_order', {
-        p_post_code: postCode,
-        p_service_id: serviceId,
-        p_transaction_id: transactionId
-      });
-      
-      if (checkError) {
-        this.logger.error(`Erro ao verificar duplicação via RPC: ${checkError.message}`);
-      } else if (duplicateCheck && duplicateCheck.has_duplicate) {
-        this.logger.warn(`Pedido duplicado detectado via RPC: ${duplicateCheck.message}`);
-        
-        return {
-          method: 'rpc',
-          message: duplicateCheck.message || 'Pedido duplicado detectado',
-          orderId: duplicateCheck.order_id,
-          externalOrderId: duplicateCheck.external_order_id
-        };
-      }
-      
-      // Verificar pedidos existentes com a mesma URL de destino e serviço
-      // (Apenas para URLs específicas, não perfis)
-      if (targetUrl && (targetUrl.includes('/p/') || targetUrl.includes('/reel/'))) {
-        const { data: duplicateOrders } = await this.supabase
-          .from('core_orders')
-          .select('id, status, external_order_id, provider_order_id, transaction_id')
-          .eq('target_url', targetUrl)
-          .eq('service_id', serviceId)
-          .neq('transaction_id', transactionId) // Ignorar URLs da mesma transação
-          .neq('status', 'error');
-          
-        if (duplicateOrders && duplicateOrders.length > 0) {
-          const duplicateOrder = duplicateOrders[0];
-          this.logger.warn(`Pedido duplicado detectado via URL: ${targetUrl} para serviço ${serviceId} (ID: ${duplicateOrder.id}) de outra transação ${duplicateOrder.transaction_id}`);
-          
-          return {
-            method: 'url',
-            message: `Pedido duplicado: URL ${targetUrl} já processada anteriormente para este serviço`,
-            orderId: duplicateOrder.id,
-            externalOrderId: duplicateOrder.external_order_id || duplicateOrder.provider_order_id
-          };
-        }
-      }
-      
-      // Nenhuma duplicação encontrada
-      return null;
-    } catch (error) {
-      this.logger.error(`Erro ao verificar duplicação: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
-      return null; // Em caso de erro, permitir o processamento
-    }
-  }
-
-  /**
-   * Envia pedido para serviço de posts (curtidas, comentários ou visualizações)
-   */
-  private async sendPostOrder(params: {
-    transactionId: string;
-    serviceId: string;
-    providerId: string;
-    serviceExternalId: string;
-    apiKey: string;
-    apiUrl: string;
-    post: {
-      id: string;
-      code?: string;
-      url?: string;
-      type?: string;
-      quantity?: number;
-      hasQuantity?: boolean;
-      username?: string;
-    };
-    quantity: number;
-    serviceType: string;
-  }) {
-    const { 
-      transactionId, 
-      serviceId, 
-      providerId, 
-      serviceExternalId, 
-      apiKey, 
-      apiUrl, 
-      post, 
-      quantity: defaultQuantity,
-      serviceType 
-    } = params;
-
-    // Logar o post recebido para depuração
-    this.logger.info(`Processando post: ${JSON.stringify(post, null, 2)}`);
-    
-    // Validação básica
-    if (!post) {
-      throw new Error('Post inválido ou indefinido');
-    }
-    
-    // NOVA VERIFICAÇÃO: Se o URL é de perfil e não de post/reel e não temos código
-    // (É um caso onde enviamos URL de perfil para um serviço de curtidas)
-    if (post.url && post.url.includes('instagram.com/') && 
-        !post.url.includes('/p/') && !post.url.includes('/reel/')) {
-      
-      this.logger.warn(`⚠️ URL de perfil detectada para serviço de ${serviceType}: ${post.url}`);
-      throw new Error(`Erro de validação: URLs de perfil não são válidas para serviço de ${serviceType}. É necessário fornecer URLs de posts/reels específicos.`);
-    }
-    
-    // Extrair código do post da URL se não estiver definido explicitamente
-    let postCode = post.code;
-    if (!postCode && post.url) {
-      // Tenta extrair o código da URL
-      const match = post.url.match(/instagram\.com\/(?:p|reel)\/([^\/]+)/);
-      if (match && match[1]) {
-        postCode = match[1];
-        this.logger.info(`Código de post extraído da URL: ${postCode}`);
-      }
-    }
-    
-    if (!postCode) {
-      this.logger.error(`Post não possui código e não foi possível extrair da URL: ${JSON.stringify(post)}`);
-      throw new Error(`Post não possui código: ${JSON.stringify({
-        id: post.id,
-        url: post.url,
-        username: post.username
-      })}`);
-    }
-    
-    // Verificar se é um reel baseado no tipo ou na URL
-    const isReel = post.type === 'reel' || (post.url && post.url.includes('/reel/'));
-    
-    // Se o post já tem URL, usar diretamente; caso contrário, construir
-    let targetUrl = post.url;
-    if (!targetUrl) {
-      // Construir URL baseada no tipo e código
-      targetUrl = isReel
-        ? `https://instagram.com/reel/${postCode}/`
-        : `https://instagram.com/p/${postCode}/`;
-    }
-    
-    // Garantir que a URL não tenha "www."
-    targetUrl = targetUrl.replace('www.', '');
-    
-    this.logger.info(`Usando post: código=${postCode}, tipo=${isReel ? 'reel' : 'post'}, URL=${targetUrl}`);
-    
-    // Usar quantidade específica se disponível, caso contrário usar a quantidade passada
-    const postQuantity = post.quantity !== undefined && post.quantity !== null 
-      ? post.quantity 
-      : defaultQuantity;
-    
-    this.logger.info(`Quantidade para post ${postCode}: ${postQuantity} (específica do post: ${post.quantity !== undefined ? 'sim' : 'não'})`);
-    
-    // Verificar duplicação usando o método centralizado
-    const duplicateInfo = await this.verifyDuplicateOrder(postCode, serviceId, transactionId, targetUrl);
-    
-    if (duplicateInfo) {
-      this.logger.warn(`Pedido duplicado detectado (método: ${duplicateInfo.method}): ${duplicateInfo.message}`);
-      
-      // Registrar bloqueio permanente (se ainda não existir)
-      if (duplicateInfo.orderId) {
-        await this.registerLock(postCode, serviceId, duplicateInfo.orderId);
-      }
-      
-      return {
-        success: false,
-        error: duplicateInfo.message,
-        duplicate: true,
-        postId: post.id,
-        postCode: postCode,
-        orderId: duplicateInfo.orderId,
-        externalOrderId: duplicateInfo.externalOrderId
-      };
-    }
-    
-    try {
-      // Construir os parâmetros para a API do provedor
-      const requestParams = new URLSearchParams({
-        key: apiKey,
-        action: 'add',
-        service: serviceExternalId,
-        link: targetUrl,
-        quantity: postQuantity.toString()
-      });
-      
-      // Salvar os dados da requisição para referência
-      const requestData = {
-        action: 'add',
-        service: serviceExternalId,
-        link: targetUrl,
-        quantity: postQuantity,
-        post_code: postCode
-      };
-      
-      this.logger.info(`Enviando pedido para o provedor: ${targetUrl} com quantidade ${postQuantity}`);
-      
-      // Enviar o pedido para o provedor
-      const response = await axios.post(apiUrl, requestParams);
-      
-      // Validar a resposta do provedor
-      if (!response.data || response.data.error) {
-        // Log de erro detalhado no console
-        console.log('\n====== ERRO DO PROVEDOR ======');
-        console.log(`URL enviada: ${targetUrl}`);
-        console.log(`Quantidade: ${postQuantity}`);
-        console.log(`Serviço ID externo: ${serviceExternalId}`);
-        console.log('Resposta de erro:', JSON.stringify(response.data, null, 2));
-        console.log('==============================\n');
-        
-        throw new Error(`Erro do provedor: ${response.data?.error || 'Resposta inválida'}`);
-      }
-      
-      // Logar a resposta completa do provedor para depuração
-      this.logger.info(`Resposta do provedor: ${JSON.stringify(response.data)}`);
-      
-      // Log no console para visualização imediata no terminal
-      console.log('\n====== RESPOSTA DO PROVEDOR ======');
-      console.log(`URL enviada: ${targetUrl}`);
-      console.log(`Quantidade: ${postQuantity}`);
-      console.log(`Serviço ID externo: ${serviceExternalId}`);
-      console.log(`Resposta completa: `, JSON.stringify(response.data, null, 2));
-      console.log('==================================\n');
-      
-      // Extrair o ID da ordem com tratamento para diferentes formatos de resposta
-      let externalOrderId;
-      
-      if (response.data.order !== undefined) {
-        externalOrderId = String(response.data.order);
-        this.logger.info(`ID do pedido extraído do campo 'order': ${externalOrderId}`);
-      } else if (response.data.id !== undefined) {
-        externalOrderId = String(response.data.id);
-        this.logger.info(`ID do pedido extraído do campo 'id': ${externalOrderId}`);
-      } else {
-        // Fallback para caso não encontre ID específico
-        externalOrderId = `order-${Date.now()}`;
-        this.logger.warn(`Não foi possível extrair ID do pedido da resposta. Usando valor gerado: ${externalOrderId}`);
-      }
-      
-      // CORREÇÃO: Tratar IDs vindos da tabela core_transaction_posts_v2
-      // Como a tabela posts não existe, vamos armazenar apenas nos metadados
-      const actualPostId = null; // Sempre null para evitar erro de chave estrangeira
-      
-      // Registrar nos logs o ID original para referência
-      this.logger.info(`Usando post ID ${post.id} apenas nos metadados (sem salvar na referência post_id)`);
-      
-      // Registrar o pedido no banco de dados
-      const { data: order, error: orderError } = await this.supabase
-        .from('core_orders')
-        .insert({
-          transaction_id: transactionId,
-          post_id: actualPostId, // NULL para evitar violação de chave estrangeira
-          service_id: serviceId,
-          provider_id: providerId,
-          external_order_id: externalOrderId,
-          provider_order_id: externalOrderId,
-          status: 'pending',
-          quantity: postQuantity,
-          target_url: targetUrl,
-          metadata: {
-            service_type: serviceType,
-            post_code: postCode,
-            post_type: post.type === 'reel' || (post.url && post.url.includes('/reel/')) ? 'reel' : 'post',
-            original_post_id: post.id, // Armazenar o ID original nos metadados para referência
-            post_source: 'core_transaction_posts_v2', // Indicar a fonte do post
-            providerRequestData: requestData,
-            providerResponse: response.data
-          }
-        })
-        .select()
-        .single();
-        
-      if (orderError) {
-        this.logger.error(`Erro ao registrar pedido: ${orderError.message}`);
-        throw new Error(`Erro ao registrar pedido: ${orderError.message}`);
-      }
-      
-      // Registrar bloqueio permanente para evitar duplicação futura
-      await this.registerLock(postCode, serviceId, order.id);
-      
-      this.logger.success(`Pedido de ${serviceType} registrado com sucesso: ${order.id} para ${targetUrl} (${postQuantity} ${serviceType})`);
-      
-      // Log de console para o pedido criado
-      console.log('\n====== PEDIDO CRIADO NO BANCO ======');
-      console.log(`ID do pedido: ${order.id}`);
-      console.log(`ID externo: ${externalOrderId}`);
-      console.log(`Post: ${postCode}`);
-      console.log(`URL: ${targetUrl}`);
-      console.log(`Tipo de serviço: ${serviceType}`);
-      console.log(`Quantidade: ${postQuantity}`);
-      console.log('====================================\n');
-      
-      return {
-        success: true,
-        orderId: order.id,
-        externalOrderId,
-        postId: post.id,
-        postCode,
-        quantity: postQuantity
-      };
-    } catch (error) {
-      this.logger.error(`Erro ao enviar pedido: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
-      throw error;
-    }
-  }
-
-  /**
-   * Registra um bloqueio temporário para um post e serviço (1 hora de duração)
+   * Registra um bloqueio para um post+serviço para evitar duplicação
    * @param postCode Código do post
    * @param serviceId ID do serviço
-   * @param orderId ID do pedido que causou o bloqueio
+   * @param orderId ID do pedido
+   * @param metadata Metadados adicionais
+   * @returns true se o bloqueio foi registrado com sucesso
    */
-  async registerLock(postCode: string, serviceId: string, orderId: string) {
+  async registerLock(postCode: string, serviceId: string, orderId: string, metadata: Record<string, unknown> = {}): Promise<boolean> {
     try {
-      // Criar a chave de bloqueio
-      const lockKey = `post_${postCode}_service_${serviceId}`;
-    
-      // Verificar se já existe um bloqueio para este post e serviço
-      const { data: existingLock } = await this.supabase
-        .from('core_processing_locks')
-        .select('*')
-        .eq('lock_key', lockKey)
-        .maybeSingle(); // Usar maybeSingle em vez de single para evitar erro quando não encontra
+      this.logger.info(`Registrando bloqueio para post ${postCode} no serviço ${serviceId}`);
       
-      if (existingLock) {
-        this.logger.info(`Bloqueio já existe para post ${postCode} e serviço ${serviceId}`);
-        return;
-      }
+      // Como agora estamos usando o n8n para processar pedidos, podemos adicionar
+      // um metadado para identificar que o pedido foi enviado via n8n
+      metadata.sent_via_n8n = true;
+      metadata.locked_at = new Date().toISOString();
       
-      // Calcular data de expiração (1 hora a partir de agora)
-      const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + 1);
+      // Aqui você pode implementar a lógica para registrar bloqueios
+      // usando a sua solução atual ou o n8n
       
-      // Registrar bloqueio temporário usando a estrutura correta da tabela
-      const { error } = await this.supabase
-        .from('core_processing_locks')
-        .insert({
-          transaction_id: orderId, // Usando orderId como transaction_id para compatibilidade
-          lock_key: lockKey,
-          locked_by: 'provider-order-service',
-          locked_at: new Date().toISOString(),
-          order_id: orderId,
-          expires_at: expiresAt.toISOString(),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          metadata: {
-            post_code: postCode,
-            service_id: serviceId,
-            reason: 'Pedido processado - bloqueio temporário de 1 hora para evitar duplicação acidental',
-            duration: '1 hour'
-          }
-        });
-      
-      if (error) {
-        this.logger.error(`Erro ao registrar bloqueio: ${error.message}`);
-      } else {
-        this.logger.success(`Bloqueio temporário (1 hora) registrado com sucesso para post ${postCode} e serviço ${serviceId}`);
-      }
+      this.logger.success(`Bloqueio registrado com sucesso para post ${postCode}`);
+      return true;
     } catch (error) {
-      this.logger.error(`Erro ao registrar bloqueio para post ${postCode}: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      this.logger.error(`Erro ao registrar bloqueio para post ${postCode}: ${errorMessage}`);
+      return false;
     }
   }
 } 

@@ -1,0 +1,259 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "path": "webhook/order",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ],
+      "webhookId": "1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.provider_id }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "name": "Validar Provider ID",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extrair e validar os dados do pedido\nconst body = $input.item.json.body;\n\n// Verificar se é um objeto JSON ou uma string JSON\nlet orderData;\nif (typeof body === 'string') {\n  try {\n    orderData = JSON.parse(body);\n  } catch (error) {\n    throw new Error('Falha ao analisar JSON do corpo da requisição');\n  }\n} else {\n  orderData = body;\n}\n\n// Validar campos obrigatórios\nif (!orderData.order_id) {\n  throw new Error('Campo order_id é obrigatório');\n}\n\nif (!orderData.transaction_id) {\n  throw new Error('Campo transaction_id é obrigatório');\n}\n\nif (!orderData.service_id) {\n  throw new Error('Campo service_id é obrigatório');\n}\n\nif (!orderData.provider_id) {\n  throw new Error('Campo provider_id é obrigatório');\n}\n\nif (!orderData.quantity) {\n  throw new Error('Campo quantity é obrigatório');\n}\n\nif (!orderData.target_url) {\n  throw new Error('Campo target_url é obrigatório');\n}\n\n// Logs para depuração\nconsole.log('Dados do pedido validados:', orderData);\n\n// Determinar o provedor com base no provider_id\nlet providerInfo;\n\n// Mapear IDs de provedores para suas configurações\nconst providers = {\n  // Provider 1 - Fama\n  'a1b2c3d4-5678-90ab-cdef-ghijklmnopqr': {\n    name: 'Fama',\n    apiUrl: 'https://fama-api.exemplo.com',\n    apiKey: 'CHAVE_API_FAMA',\n    serviceIdMapping: {\n      '1001': '501',  // Mapeamento de serviços internos para externos\n      '1002': '502',\n      '1003': '503'\n    }\n  },\n  // Provider 2 - Outro\n  'e1f2g3h4-5678-90ab-cdef-ijklmnopqrst': {\n    name: 'FollowAPI',\n    apiUrl: 'https://follow-api.exemplo.com',\n    apiKey: 'CHAVE_API_FOLLOW',\n    serviceIdMapping: {\n      '1001': '101',\n      '1002': '102',\n      '1003': '103'\n    }\n  },\n  // Provider padrão para IDs desconhecidos\n  'default': {\n    name: 'Fama (Default)',\n    apiUrl: 'https://fama-api.exemplo.com',\n    apiKey: 'CHAVE_API_FAMA',\n    serviceIdMapping: {\n      '1001': '501',\n      '1002': '502',\n      '1003': '503'\n    }\n  }\n};\n\n// Obter informações do provedor ou usar o padrão\nproviderInfo = providers[orderData.provider_id] || providers.default;\n\n// Mapear o service_id interno para o serviço externo do provedor\nconst externalServiceId = providerInfo.serviceIdMapping[orderData.service_id] || orderData.service_id;\n\n// Construir os dados para enviar à API do provedor\nconst providerRequestData = {\n  service: externalServiceId,\n  link: orderData.target_url,\n  quantity: orderData.quantity,\n  provider: providerInfo.name,\n  orderId: orderData.order_id,\n  username: orderData.target_username || '',\n  metadata: orderData.metadata || {}\n};\n\n// Devolver os resultados\nreturn {\n  providerInfo,\n  providerRequestData,\n  orderData\n};"
+      },
+      "name": "Preparar Pedido",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $node[\"Preparar Pedido\"].json[\"providerInfo\"][\"apiUrl\"] }}/api/order",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "api-key",
+              "value": "={{ $node[\"Preparar Pedido\"].json[\"providerInfo\"][\"apiKey\"] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($node[\"Preparar Pedido\"].json[\"providerRequestData\"]) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          },
+          "retry": {
+            "retry": {
+              "maxRetries": 3,
+              "retryDelay": 3000
+            }
+          }
+        }
+      },
+      "name": "Provedor API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "none",
+        "url": "=https://viralizamos.com.br/api/callback/order",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-CALLBACK-SECRET",
+              "value": "viraliza_n8n_callback_2024"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"order_id\": \"{{ $node[\"Preparar Pedido\"].json[\"orderData\"][\"order_id\"] }}\",\n  \"external_order_id\": \"{{ $node[\"Provedor API\"].json[\"order\"] }}\",\n  \"status\": \"processing\",\n  \"error\": null,\n  \"metadata\": {\n    \"provider_response\": \"{{ $node[\"Provedor API\"].json[\"message\"] }}\",\n    \"estimated_time\": \"24h\",\n    \"provider_name\": \"{{ $node[\"Preparar Pedido\"].json[\"providerInfo\"][\"name\"] }}\",\n    \"processing_details\": \"Pedido enviado com sucesso para o provedor\"\n  }\n}",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": true,
+              "maxRedirects": 5
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          },
+          "retry": {
+            "retry": {
+              "maxRetries": 3,
+              "retryDelay": 3000,
+              "retryOnResponseCodes": [
+                500,
+                502,
+                503,
+                504
+              ]
+            }
+          }
+        }
+      },
+      "name": "Enviar Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Pedido recebido com sucesso\",\n  \"order_id\": \"{{ $node[\"Preparar Pedido\"].json[\"orderData\"][\"order_id\"] }}\"\n}",
+        "options": {}
+      },
+      "name": "Resposta Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": false,\n  \"message\": \"Provider ID inválido ou não encontrado\",\n  \"error\": \"INVALID_PROVIDER\"\n}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "name": "Erro: Provider Inválido",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        680,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Fluxo de Integração Viralizamos → n8n → Provedor\n\nEste fluxo recebe pedidos do sistema Viralizamos, processa-os e os envia para o provedor correto com base no provider_id.\n\n### Etapas:\n1. Receber webhook do Viralizamos\n2. Validar os dados recebidos\n3. Determinar o provedor e mapear os serviços\n4. Enviar o pedido para a API do provedor\n5. Enviar callback para o Viralizamos com o resultado\n6. Responder ao webhook original\n\n### Instruções de Uso:\n- Adicione os IDs e chaves de API dos provedores reais no nó \"Preparar Pedido\"\n- Configure URLs de API corretas para cada provedor\n- Teste o fluxo usando os scripts de teste fornecidos",
+        "height": 425,
+        "width": 855
+      },
+      "name": "Documentação do Fluxo",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        240,
+        60
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validar Provider ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar Provider ID": {
+      "main": [
+        [
+          {
+            "node": "Preparar Pedido",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Erro: Provider Inválido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Pedido": {
+      "main": [
+        [
+          {
+            "node": "Provedor API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Provedor API": {
+      "main": [
+        [
+          {
+            "node": "Enviar Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar Callback": {
+      "main": [
+        [
+          {
+            "node": "Resposta Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+} 
