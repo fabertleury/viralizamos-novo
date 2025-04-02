@@ -4,6 +4,7 @@ import mercadopago from 'mercadopago';
 import QRCode from 'qrcode';
 import { processTransaction } from '@/lib/transactions/transactionProcessor';
 import { BackgroundPaymentChecker } from '@/lib/services/backgroundPaymentChecker';
+import { transactionMonitoring } from '@/lib/monitoring/transactionMonitoring';
 
 export async function POST(request: NextRequest) {
   try {
@@ -256,6 +257,12 @@ export async function POST(request: NextRequest) {
 
     if (transactionError) {
       throw transactionError;
+    }
+
+    // Registrar a transação no sistema de monitoramento
+    if (transaction && transaction.length > 0) {
+      await transactionMonitoring.logTransaction(transaction[0]);
+      console.log(`Transação ${transaction[0].id} registrada no sistema de monitoramento`);
     }
 
     // Se o pagamento foi aprovado, processar a transação

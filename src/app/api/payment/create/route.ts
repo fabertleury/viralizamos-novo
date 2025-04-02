@@ -5,6 +5,7 @@ import QRCode from 'qrcode';
 import { processTransaction } from '@/lib/transactions/transactionProcessor';
 import { BackgroundPaymentChecker } from '@/lib/services/backgroundPaymentChecker';
 import { TransactionService } from '@/lib/core/payment/transactionService';
+import { transactionMonitoring } from '@/lib/monitoring/transactionMonitoring';
 
 export async function POST(request: NextRequest) {
   try {
@@ -230,6 +231,17 @@ export async function POST(request: NextRequest) {
     if (oldTransactionError) {
       console.error('Erro ao salvar na tabela antiga:', oldTransactionError);
       // Continuar mesmo se houver erro, pois a transação principal já foi criada
+    }
+    
+    // Registrar ambas as transações no sistema de monitoramento
+    if (transactionResult.transaction) {
+      await transactionMonitoring.logTransaction(transactionResult.transaction);
+      console.log(`Transação principal ${transactionResult.transactionId} registrada no sistema de monitoramento`);
+    }
+    
+    if (oldTransaction && oldTransaction.length > 0) {
+      await transactionMonitoring.logTransaction(oldTransaction[0]);
+      console.log(`Transação antiga ${oldTransaction[0].id} registrada no sistema de monitoramento`);
     }
 
     // Se o pagamento foi aprovado, processar a transação
