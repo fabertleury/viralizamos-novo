@@ -7,6 +7,7 @@ import { transactionProcessing } from '@/lib/transactions/utils/transactionProce
 import { logger } from '@/lib/logger';
 import fs from 'fs';
 import path from 'path';
+import { transactionMonitoring } from '@/lib/monitoring/transactionMonitoring';
 
 type WebhookHeaders = {
   'user-agent'?: string;
@@ -93,6 +94,13 @@ export class MercadoPagoWebhook {
     logToFile('[MercadoPagoWebhook] Recebendo notificação de webhook');
     
     try {
+      // Registrar webhook recebido no sistema de monitoramento
+      const webhookId = await transactionMonitoring.logWebhook(
+        'mercadopago',
+        'payment_webhook',
+        body
+      );
+      
       // Log dos cabeçalhos importantes
       logger.info('[MercadoPagoWebhook] User-Agent:', headers['user-agent']);
       logger.info('[MercadoPagoWebhook] Content-Type:', headers['content-type']);
@@ -174,6 +182,17 @@ export class MercadoPagoWebhook {
     } catch (error) {
       logger.error('[MercadoPagoWebhook] Erro ao processar webhook:', error);
       return { success: false, error };
+    } finally {
+      // Atualizar status do webhook no monitoramento
+      if (webhookId) {
+        await transactionMonitoring.updateWebhookProcessed(
+          webhookId,
+          true,
+          500,
+          { error: error?.message || 'Erro desconhecido' },
+          Date.now() - startTime
+        );
+      }
     }
   }
   
@@ -246,8 +265,9 @@ export class MercadoPagoWebhook {
     logToFile(`[MercadoPagoWebhook] Pagamento aprovado, ID: ${paymentId}, verificando processamento automático`);
     
     try {
-      // Verificar se o pagamento já possui uma transação associada
+      // Registrar transação no sistema de monitoramento
       const transaction = await this.databaseService.getTransactionByPaymentId(paymentId);
+      await transactionMonitoring.logTransaction(transaction);
       
       if (!transaction) {
         logger.error(`[MercadoPagoWebhook] Pagamento ${paymentId} não possui transação associada`);
@@ -313,7 +333,19 @@ export class MercadoPagoWebhook {
           // Processar a transação automaticamente
           logger.info('[MercadoPagoWebhook] Processando transação automaticamente:', transaction.id);
           logToFile(`[MercadoPagoWebhook] PROCESSANDO TRANSAÇÃO ${transaction.id} automaticamente após confirmação do pagamento`);
-        const result = await this.processTransaction.executeStrategy(transaction);
+          const result = await this.processTransaction.executeStrategy(transaction);
+          
+          // Registrar resultado da integração no monitoramento
+          await transactionMonitoring.logIntegration(
+            transaction.id,
+            transaction.id,
+            null,
+            transaction,
+            result,
+            result.success ? 'success' : 'failed',
+            result.success ? undefined : result.error
+          );
+          
           logger.info('[MercadoPagoWebhook] Resultado do processamento automático:', result);
           logToFile(`[MercadoPagoWebhook] Resultado do processamento automático: ${JSON.stringify(result)}`);
           return result;

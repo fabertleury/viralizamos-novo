@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { N8NOrder, N8NResponse, N8NConfig, OrderStatus } from './types';
 import { createClient } from '@/lib/supabase/server';
+import { transactionMonitoring } from '@/lib/monitoring/transactionMonitoring';
 
 /**
  * Serviço para integração com o N8N
@@ -42,6 +43,11 @@ export class N8NIntegrationService {
   async sendOrder(orderData: N8NOrder, useTestEnvironment = false): Promise<N8NResponse> {
     try {
       if (!this.isEnabled()) {
+        this.logger.error(`Integração com N8N não está habilitada. Configurações atuais:
+          ENABLE_N8N_INTEGRATION: ${this.config.enabled}
+          N8N_WEBHOOK_URL: ${this.config.webhookUrl ? 'Configurado' : 'Não configurado'}
+          N8N_WEBHOOK_URL_TEST: ${this.config.testWebhookUrl ? 'Configurado' : 'Não configurado'}
+          N8N_API_KEY: ${this.config.apiKey ? 'Configurado' : 'Não configurado'}`);
         throw new Error('Integração com N8N não está habilitada');
       }
       
@@ -51,10 +57,18 @@ export class N8NIntegrationService {
         : this.config.webhookUrl;
       
       if (!webhookUrl) {
+        this.logger.error(`URL do webhook do N8N para ambiente ${useTestEnvironment ? 'de teste' : 'de produção'} não configurada.
+          N8N_WEBHOOK_URL: ${this.config.webhookUrl || 'Não configurado'}
+          N8N_WEBHOOK_URL_TEST: ${this.config.testWebhookUrl || 'Não configurado'}`);
         throw new Error(`URL do webhook do N8N para ambiente ${useTestEnvironment ? 'de teste' : 'de produção'} não configurada`);
       }
       
-      this.logger.info(`Enviando pedido ${orderData.order_id} para o N8N (${useTestEnvironment ? 'teste' : 'produção'})`);
+      this.logger.info(`Enviando pedido ${orderData.order_id} para o N8N (${useTestEnvironment ? 'teste' : 'produção'})
+        URL: ${webhookUrl}
+        Service ID: ${orderData.service_id}
+        Provider ID: ${orderData.provider_id}
+        Target URL: ${orderData.target_url || 'N/A'}
+        Username: ${orderData.target_username || 'N/A'}`);
       
       // Preparar dados para envio
       const payload = {
@@ -70,36 +84,100 @@ export class N8NIntegrationService {
         password
       };
       
-      // Enviar para o webhook do N8N
-      const response = await axios.post(webhookUrl, payload, {
-        auth,
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        timeout: 30000 // 30 segundos
-      });
+      // Registrar tentativa de integração
+      await transactionMonitoring.logIntegration(
+        orderData.order_id,
+        orderData.transaction_id || null,
+        'n8n',
+        orderData,
+        null,
+        'pending',
+        null
+      );
       
-      // Verificar se a resposta foi bem-sucedida
-      if (response.status === 200 && response.data) {
-        this.logger.info(`Pedido ${orderData.order_id} enviado com sucesso para o N8N`);
+      // Enviar para o webhook do N8N com mais detalhes de debug
+      try {
+        this.logger.info(`Iniciando requisição para ${webhookUrl}`);
+        const response = await axios.post(webhookUrl, payload, {
+          auth,
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          timeout: 30000 // 30 segundos
+        });
         
-        // Registrar resposta no banco de dados
-        await this.logOrderSent(orderData.order_id, payload, response.data);
+        this.logger.info(`Resposta recebida: Status ${response.status}`);
         
-        return {
-          success: true,
-          order_id: orderData.order_id,
-          external_order_id: response.data.external_order_id || response.data.order_id
-        };
-      } else {
-        this.logger.error(`Erro ao enviar pedido ${orderData.order_id} para o N8N: Resposta inválida`);
+        // Verificar se a resposta foi bem-sucedida
+        if (response.status === 200 && response.data) {
+          this.logger.info(`Pedido ${orderData.order_id} enviado com sucesso para o N8N. Resposta: ${JSON.stringify(response.data)}`);
+          
+          // Registrar resposta no banco de dados
+          await this.logOrderSent(orderData.order_id, payload, response.data);
+          
+          // Registrar resposta bem-sucedida no monitoramento
+          await transactionMonitoring.logIntegration(
+            orderData.order_id,
+            orderData.transaction_id || null,
+            'n8n',
+            payload,
+            response.data,
+            'success',
+            null
+          );
+          
+          return {
+            success: true,
+            order_id: orderData.order_id,
+            external_order_id: response.data.external_order_id || response.data.order_id
+          };
+        } else {
+          this.logger.error(`Erro ao enviar pedido ${orderData.order_id} para o N8N: Resposta inválida. Status: ${response.status}, Dados: ${JSON.stringify(response.data)}`);
+          
+          // Registrar erro no banco de dados
+          await this.logOrderError(orderData.order_id, payload, `Resposta inválida: ${JSON.stringify(response.data)}`);
+          
+          // Registrar erro no monitoramento
+          await transactionMonitoring.logIntegration(
+            orderData.order_id,
+            orderData.transaction_id || null,
+            'n8n',
+            payload,
+            response.data,
+            'error',
+            `Resposta inválida: ${JSON.stringify(response.data)}`
+          );
+          
+          return {
+            success: false,
+            error: 'Resposta inválida do N8N'
+          };
+        }
+      } catch (axiosError) {
+        // Erro específico do axios
+        const errorMessage = axiosError.response 
+          ? `Erro HTTP ${axiosError.response.status}: ${JSON.stringify(axiosError.response.data)}` 
+          : axiosError.message;
+          
+        this.logger.error(`Erro de comunicação ao enviar pedido ${orderData.order_id} para o N8N: ${errorMessage}`);
         
         // Registrar erro no banco de dados
-        await this.logOrderError(orderData.order_id, payload, `Resposta inválida: ${JSON.stringify(response.data)}`);
+        await this.logOrderError(orderData.order_id, payload, errorMessage);
+        
+        // Registrar erro no monitoramento
+        await transactionMonitoring.logIntegration(
+          orderData.order_id,
+          orderData.transaction_id || null,
+          'n8n',
+          payload,
+          axiosError.response?.data || null,
+          'error',
+          errorMessage
+        );
         
         return {
           success: false,
-          error: 'Resposta inválida do N8N'
+          error: errorMessage
         };
       }
     } catch (error) {
@@ -108,6 +186,17 @@ export class N8NIntegrationService {
       
       // Registrar erro no banco de dados
       await this.logOrderError(orderData.order_id, orderData, errorMessage);
+      
+      // Registrar erro no monitoramento
+      await transactionMonitoring.logIntegration(
+        orderData.order_id,
+        orderData.transaction_id || null,
+        'n8n',
+        orderData,
+        null,
+        'error',
+        errorMessage
+      );
       
       return {
         success: false,
@@ -131,6 +220,13 @@ export class N8NIntegrationService {
       }
       
       this.logger.info(`Recebido callback do N8N para o pedido ${orderId}`);
+      
+      // Registrar callback recebido
+      await transactionMonitoring.logWebhook(
+        'n8n_callback',
+        'n8n',
+        callbackData
+      );
       
       // Registrar callback no banco de dados
       await this.logCallback(orderId, callbackData);
@@ -238,158 +334,4 @@ export class N8NIntegrationService {
       if (error) {
         this.logger.error(`Erro ao atualizar pedido ${orderId}: ${error.message}`);
       } else {
-        this.logger.info(`Pedido ${orderId} atualizado com external_id ${externalOrderId} e status ${orderStatus}`);
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      this.logger.error(`Erro ao atualizar ordem individual: ${errorMessage}`);
-    }
-  }
-  
-  /**
-   * Atualiza o status de uma transação com base no callback
-   */
-  private async updateTransactionStatus(orderId: string, status: string): Promise<void> {
-    const supabase = createClient();
-    
-    // Mapear o status para um dos status válidos do sistema
-    let transactionStatus: string;
-    
-    switch (status.toLowerCase()) {
-      case 'completed':
-        transactionStatus = OrderStatus.COMPLETED;
-        break;
-      case 'processing':
-        transactionStatus = OrderStatus.PROCESSING;
-        break;
-      case 'error':
-        transactionStatus = OrderStatus.ERROR;
-        break;
-      case 'cancelled':
-        transactionStatus = OrderStatus.CANCELLED;
-        break;
-      default:
-        transactionStatus = OrderStatus.PENDING;
-    }
-    
-    try {
-      // Primeiro, tente atualizar pelo payment_id direto
-      const { data: updateResult, error } = await supabase
-        .from('core_transactions_v2')
-        .update({
-          status: transactionStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('payment_id', orderId);
-      
-      if (error) {
-        this.logger.error(`Erro ao atualizar transação por payment_id ${orderId}: ${error.message}`);
-      } else if (updateResult && updateResult.length > 0) {
-        this.logger.info(`Transação com payment_id ${orderId} atualizada para status ${transactionStatus}`);
-        return;
-      }
-      
-      // Se não encontrou pelo payment_id, tente com n8n_order_id
-      const { error: error2 } = await supabase
-        .from('core_transactions_v2')
-        .update({
-          status: transactionStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('n8n_order_id', orderId);
-      
-      if (error2) {
-        this.logger.error(`Erro ao atualizar transação por n8n_order_id ${orderId}: ${error2.message}`);
-      } else {
-        this.logger.info(`Transação com n8n_order_id ${orderId} atualizada para status ${transactionStatus}`);
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      this.logger.error(`Erro ao atualizar status da transação: ${errorMessage}`);
-    }
-    
-    // Também atualizar na tabela n8n_order_status
-    try {
-      await supabase.from('n8n_order_status')
-        .upsert({
-          order_id: orderId,
-          status: transactionStatus,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'order_id' });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      this.logger.error(`Erro ao atualizar status na tabela n8n_order_status: ${errorMessage}`);
-    }
-  }
-  
-  /**
-   * Registra o envio de um pedido
-   */
-  private async logOrderSent(
-    orderId: string, 
-    orderData: N8NOrder, 
-    responseData: Record<string, unknown>
-  ): Promise<void> {
-    try {
-      const supabase = createClient();
-      
-      await supabase.from('n8n_order_logs').insert({
-        order_id: orderId,
-        event_type: 'order_sent',
-        request_data: orderData,
-        response_data: responseData,
-        created_at: new Date().toISOString()
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      this.logger.error(`Erro ao registrar envio de pedido: ${errorMessage}`);
-    }
-  }
-  
-  /**
-   * Registra um erro ao enviar um pedido
-   */
-  private async logOrderError(
-    orderId: string, 
-    orderData: N8NOrder, 
-    errorMessage: string
-  ): Promise<void> {
-    try {
-      const supabase = createClient();
-      
-      await supabase.from('n8n_order_logs').insert({
-        order_id: orderId,
-        event_type: 'order_error',
-        request_data: orderData,
-        error_message: errorMessage,
-        created_at: new Date().toISOString()
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      this.logger.error(`Erro ao registrar erro de pedido: ${errorMessage}`);
-    }
-  }
-  
-  /**
-   * Registra um callback recebido
-   */
-  private async logCallback(
-    orderId: string, 
-    callbackData: Record<string, unknown>
-  ): Promise<void> {
-    try {
-      const supabase = createClient();
-      
-      await supabase.from('n8n_callbacks').insert({
-        order_id: orderId,
-        callback_data: callbackData,
-        created_at: new Date().toISOString(),
-        processed: true,
-        processed_at: new Date().toISOString()
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      this.logger.error(`Erro ao registrar callback: ${errorMessage}`);
-    }
-  }
-} 
+        this.logger.info(`

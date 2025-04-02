@@ -20,6 +20,7 @@ import type { Transaction } from './types';
 import { logger } from '@/lib/logger';
 import fs from 'fs';
 import path from 'path';
+import { transactionMonitoring } from '@/lib/monitoring/transactionMonitoring';
 
 // Delay entre requisições para evitar rate limiting
 const API_REQUEST_DELAY = 1000; // 1 segundo
@@ -2041,4 +2042,67 @@ export class OrderProcessor {
     // Retornar o status normalizado ou o original
     return normalizedMap[providerStatus] || providerStatus;
   }
+
+  /**
+   * Processa uma transação e cria pedidos
+   */
+  async processTransaction(transactionId: string): Promise<any> {
+    // ... existing code ...
+    
+    try {
+      // ... existing code ...
+      
+      // Carregar a transação do banco de dados
+      const transaction = await this.loadTransaction(transactionId);
+      
+      // Registrar transação no sistema de monitoramento
+      await transactionMonitoring.logTransaction(transaction);
+      
+      // ... existing code ...
+      
+      // Criar os pedidos
+      const orders = await this.createOrders(transaction, transactionId);
+      
+      // Registrar pedidos no sistema de monitoramento
+      for (const order of orders) {
+        await transactionMonitoring.logOrder(order);
+      }
+      
+      // ... existing code ...
+    } catch (error) {
+      // ... existing code ...
+    }
+  }
+  
+  // ... existing code ...
+  
+  /**
+   * Cria um pedido e envia para o provedor apropriado
+   */
+  async createOrderForProvider(providerData: any, serviceData: any, transaction: any, metaData: any): Promise<any> {
+    // ... existing code ...
+    
+    try {
+      // ... existing code ...
+      
+      // Criar o pedido
+      const order = await this.createOrder(transaction, serviceData, providerData, metaData);
+      
+      // Registrar pedido no sistema de monitoramento
+      await transactionMonitoring.logOrder(order);
+      
+      // ... existing code ...
+      
+      // Enviar pedido para o provedor
+      const orderResponse = await this.providerService.sendOrderToProvider(provider, providerRequestData);
+      
+      // ... existing code ...
+      
+      return order;
+    } catch (error) {
+      // ... existing code ...
+    }
+  }
+  
+  // ... existing code ...
 }

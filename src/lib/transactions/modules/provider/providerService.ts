@@ -2,6 +2,7 @@ import axios from 'axios';
 import { rateLimiter } from '../rateLimit';
 import { Provider, ProviderRequestData, OrderResponse } from '../types';
 import { createClient } from '@/lib/supabase/server';
+import { transactionMonitoring } from '@/lib/monitoring/transactionMonitoring';
 
 /**
  * Serviço para interagir com provedores externos
@@ -118,6 +119,16 @@ export class ProviderService {
           };
         }
         
+        // Registrar resposta no monitoramento
+        await transactionMonitoring.logIntegration(
+          String(response.data.order || ''),
+          data.transaction_id || null,
+          provider.id || null,
+          data,
+          response.data,
+          'success'
+        );
+        
         // Padronizar o formato de retorno
         return {
           order: response.data.order || response.data.orderId,
@@ -127,6 +138,18 @@ export class ProviderService {
         };
       } catch (error) {
         console.error('[ProviderService] Erro ao enviar pedido ao provedor:', error);
+        
+        // Registrar erro no monitoramento
+        await transactionMonitoring.logIntegration(
+          'error',
+          data.transaction_id || null,
+          provider.id || null,
+          data,
+          null,
+          'error',
+          error instanceof Error ? error.message : 'Erro na comunicação com o provedor'
+        );
+        
         return {
           error: error instanceof Error ? error.message : 'Erro na comunicação com o provedor',
           status: 'error',

@@ -24,7 +24,10 @@ import {
   CheckBadgeIcon,
   ChatBubbleBottomCenterTextIcon,
   LockClosedIcon,
-  QueueListIcon
+  QueueListIcon,
+  UserIcon,
+  Cog6ToothIcon,
+  ArrowLeftOnRectangleIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -70,6 +73,11 @@ const navigation = [
     title: "Fila",
     href: "/admin/fila",
     icon: QueueListIcon
+  },
+  {
+    title: 'Monitoramento',
+    href: '/admin/monitoring',
+    icon: ChartBarIcon
   },
 ];
 
@@ -219,7 +227,7 @@ export default function AdminLayout({
                   </div>
                   <nav className="flex flex-1 flex-col">
                     <ul role="list" className="flex flex-1 flex-col gap-y-7">
-                      <li>
+                      <li key="mobile-navigation-main">
                         <ul role="list" className="-mx-2 space-y-1">
                           {navigation.map((item) => (
                             <li key={item.name}>
@@ -275,7 +283,7 @@ export default function AdminLayout({
           </div>
           <nav className="flex flex-1 flex-col">
             <ul role="list" className="flex flex-1 flex-col gap-y-7">
-              <li>
+              <li key="navigation-main">
                 <ul role="list" className="-mx-2 space-y-1">
                   {navigation.map((item) => (
                     <li key={item.name}>

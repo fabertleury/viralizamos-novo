@@ -1,0 +1,101 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("MONITORING_DATABASE_URL")
+}
+
+// Tabela de log de transações
+model TransactionsLog {
+  id            String   @id
+  payment_id    String?
+  status        String?
+  amount        Decimal? @db.Decimal(10, 2)
+  created_at    DateTime
+  metadata      Json?
+  provider_data Json?
+  logged_at     DateTime @default(now())
+
+  @@index([payment_id])
+  @@index([status])
+  @@map("transactions_log")
+}
+
+// Tabela de log de pedidos
+model OrdersLog {
+  id                String   @id
+  transaction_id    String?
+  provider_id       String?
+  service_id        String?
+  quantity          Int?
+  status            String?
+  target_url        String?  @db.Text
+  created_at        DateTime
+  provider_response Json?
+  logged_at         DateTime @default(now())
+
+  @@index([transaction_id])
+  @@index([provider_id])
+  @@index([target_url])
+  @@map("orders_log")
+}
+
+// Tabela de log de integrações
+model IntegrationsLog {
+  id             Int      @id @default(autoincrement())
+  order_id       String?
+  transaction_id String?
+  provider_id    String?
+  request_data   Json?
+  response_data  Json?
+  status         String?
+  error_message  String?  @db.Text
+  created_at     DateTime @default(now())
+
+  @@index([order_id])
+  @@index([transaction_id])
+  @@map("integrations_log")
+}
+
+// Tabela para rastreamento de webhooks
+model WebhookLogs {
+  id              Int      @id @default(autoincrement())
+  webhook_type    String
+  source          String
+  payload         Json
+  processed       Boolean  @default(false)
+  status_code     Int?
+  response_body   Json?
+  processing_time Int?     // Tempo em ms
+  received_at     DateTime @default(now())
+  processed_at    DateTime?
+
+  @@index([webhook_type])
+  @@index([processed])
+  @@map("webhook_logs")
+}
+
+// Tabela para detecção de duplicação
+model DuplicateDetection {
+  id             Int      @id @default(autoincrement())
+  hash_key       String   @unique // Hash da combinação de detalhes do pedido
+  transaction_id String
+  order_id       String?
+  target_url     String?  @db.Text
+  service_id     String?
+  provider_id    String?
+  first_seen     DateTime @default(now())
+  last_seen      DateTime @default(now())
+  count          Int      @default(1)
+
+  @@index([hash_key])
+  @@map("duplicate_detection")
+}
