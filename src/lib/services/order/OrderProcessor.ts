@@ -117,9 +117,9 @@ export class OrderProcessor {
         return false;
       }
       
-      // Calcular data de expiração (1 ano para ser permanente)
+      // Calcular data de expiração (apenas 1 minuto para não bloquear de verdade)
       const expiresAt = new Date();
-      expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+      expiresAt.setSeconds(expiresAt.getSeconds() + 95); // 1 minuto e 35 segundos para prevenir duplicação acidental
 
       // Criar a chave de bloqueio
       const lockKey = `post_${postCode}_service_${serviceId}`;
@@ -169,7 +169,7 @@ export class OrderProcessor {
           metadata: {
             post_code: postCode,
             service_id: serviceId,
-            reason: 'Pedido processado - bloqueio permanente para evitar duplicação'
+            reason: 'Pedido processado - bloqueio temporário apenas para prevenção de duplicação imediata (1 minuto e 35 segundos)'
           }
         });
         
@@ -191,7 +191,7 @@ export class OrderProcessor {
         return true; // Permitir o processamento apesar do erro, para não bloquear o fluxo
       }
       
-      this.logger.success(`Bloqueio permanente adquirido para post ${postCode} no serviço ${serviceId}`);
+      this.logger.success(`Bloqueio temporário (1 minuto e 35 segundos) adquirido para post ${postCode} no serviço ${serviceId}`);
       return true;
     } catch (error) {
       this.logger.error(`Erro ao gerenciar bloqueio para post ${postCode}: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);

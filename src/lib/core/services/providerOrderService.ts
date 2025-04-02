@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { LinkFormatter } from '../utils/linkFormatter';
 import { Logger } from '../utils/logger';
-import axios from 'axios';
 import { N8nIntegrationService } from './n8nIntegrationService';
 
 /**
@@ -157,21 +156,19 @@ export class ProviderOrderService {
    */
   async registerLock(postCode: string, serviceId: string, orderId: string, metadata: Record<string, unknown> = {}): Promise<boolean> {
     try {
-      this.logger.info(`Registrando bloqueio para post ${postCode} no serviço ${serviceId}`);
+      this.logger.info(`Processando pedido para post ${postCode} no serviço ${serviceId} (sem bloqueio permanente)`);
       
-      // Como agora estamos usando o n8n para processar pedidos, podemos adicionar
-      // um metadado para identificar que o pedido foi enviado via n8n
+      // Apenas registrar dados para fins de rastreamento, sem bloqueio
       metadata.sent_via_n8n = true;
-      metadata.locked_at = new Date().toISOString();
+      metadata.processed_at = new Date().toISOString();
+      metadata.no_blocking = true;
       
-      // Aqui você pode implementar a lógica para registrar bloqueios
-      // usando a sua solução atual ou o n8n
-      
-      this.logger.success(`Bloqueio registrado com sucesso para post ${postCode}`);
+      // Não criar bloqueio real, apenas retornar sucesso
+      this.logger.success(`Pedido processado com sucesso para post ${postCode} (sem bloqueio)`);
       return true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      this.logger.error(`Erro ao registrar bloqueio para post ${postCode}: ${errorMessage}`);
+      this.logger.error(`Erro ao processar pedido para post ${postCode}: ${errorMessage}`);
       return false;
     }
   }
