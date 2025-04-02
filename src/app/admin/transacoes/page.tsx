@@ -105,144 +105,139 @@ export default function TransacoesPage() {
       
       console.log('Buscando transações...');
       
-      // Primeiro, vamos verificar se a tabela core_transactions_v2 existe
-      const { count, error: countError } = await supabase
-        .from('core_transactions_v2')
-        .select('*', { count: 'exact', head: true });
-        
-      if (countError) {
-        console.error('Erro ao verificar a existência da tabela core_transactions_v2:', countError);
-        toast.error('Erro ao acessar a tabela de transações');
-        setLoading(false);
-        return;
-      }
-      
-      console.log('Contagem de transações disponíveis:', count);
-      
-      // Agora vamos buscar as transações
+      // Usar a nova função RPC para buscar transações recentes, incluindo PIX pendentes
       const { data, error } = await supabase
-        .from('core_transactions_v2')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
+        .rpc('get_recent_transactions', {
+          p_limit: 100,
+          p_hours: 48
+        });
         
       if (error) {
         console.error('Erro ao buscar transações:', error);
-        toast.error(`Erro: ${error.message || 'Erro desconhecido'}`);
-        setLoading(false);
-        return;
+        
+        // Fallback para o método antigo se a função RPC não existir
+        console.log('Tentando método alternativo de busca...');
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('core_transactions_v2')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(100);
+          
+        if (fallbackError) {
+          console.error('Erro ao buscar transações (fallback):', fallbackError);
+          toast.error(`Erro: ${fallbackError.message || 'Erro desconhecido'}`);
+          setLoading(false);
+          return;
+        }
+        
+        if (fallbackData && fallbackData.length > 0) {
+          console.log(`Encontradas ${fallbackData.length} transações (método alternativo)`);
+          processTransactions(fallbackData);
+          return;
+        } else {
+          toast.error(`Erro: ${error.message || 'Erro desconhecido'}`);
+          setLoading(false);
+          return;
+        }
       }
       
       console.log(`Encontradas ${data?.length || 0} transações`);
-      
-      // Buscar informações dos serviços relacionados
-      const serviceIds = data?.filter(t => t.service_id).map(t => t.service_id) || [];
-      let servicesMap = {};
-      
-      if (serviceIds.length > 0) {
-        const { data: services, error: servicesError } = await supabase
-          .from('services')
-          .select('id, name, type, preco')
-          .in('id', serviceIds);
-          
-        if (servicesError) {
-          console.error('Erro ao buscar serviços:', servicesError);
-        } else {
-          servicesMap = services.reduce((acc, service) => {
-            acc[service.id] = service;
-            return acc;
-          }, {});
-          console.log(`Encontrados ${services.length} serviços relacionados`);
-        }
-      }
-      
-      // Buscar pedidos relacionados
-      const transactionIds = data?.map(t => t.id) || [];
-      let ordersMap = {};
-      
-      if (transactionIds.length > 0) {
-        const { data: orders, error: ordersError } = await supabase
-          .from('core_orders')
-          .select('*')
-          .in('transaction_id', transactionIds);
-          
-        if (ordersError) {
-          console.error('Erro ao buscar pedidos:', ordersError);
-        } else {
-          ordersMap = transactionIds.reduce((acc, transId) => {
-            acc[transId] = orders.filter(order => order.transaction_id === transId);
-            return acc;
-          }, {});
-          console.log(`Encontrados ${orders.length} pedidos relacionados`);
-        }
-      }
-      
-      // Buscar usuários/clientes relacionados
-      const userIds = data?.filter(t => t.user_id).map(t => t.user_id) || [];
-      let usersMap = {};
-      
-      if (userIds.length > 0) {
-        const { data: users, error: usersError } = await supabase
-          .from('auth.users')
-          .select('id, email')
-          .in('id', userIds);
-          
-        if (usersError) {
-          console.error('Erro ao buscar usuários:', usersError);
-        } else if (users) {
-          usersMap = users.reduce((acc, user) => {
-            acc[user.id] = user;
-            return acc;
-          }, {});
-          console.log(`Encontrados ${users.length} usuários relacionados`);
-        }
-      }
-      
-      // Mapear os dados completos
-      const mappedTransactions = data?.map(trans => {
-        const service = servicesMap[trans.service_id] || null;
-        const orders = ordersMap[trans.id] || [];
-        
-        // Formatador da visualização do cliente
-        const displayCustomerName = trans.customer_name || 'Cliente não identificado';
-        const displayCustomerEmail = trans.customer_email || '';
-        
-        return {
-          id: trans.id,
-          created_at: trans.created_at,
-          status: trans.status,
-          amount: trans.amount * 100, // Converter para centavos para manter compatibilidade
-          payment_method: trans.payment_method,
-          customer_name: displayCustomerName,
-          customer_email: displayCustomerEmail,
-          service_id: trans.service_id,
-          service: service ? {
-            id: service.id,
-            name: service.name,
-            type: service.type
-          } : null,
-          orders: orders.map(order => ({
-            id: order.id,
-            status: order.status,
-            provider_id: order.provider_id,
-            metadata: order.metadata,
-            needs_admin_attention: order.status?.includes('failed') || order.status?.includes('error'),
-            status_provider: order.metadata?.provider_status?.status || 
-                            order.metadata?.provider_response?.status ||
-                            null,
-            external_order_id: order.provider_order_id || order.metadata?.provider_order_id
-          })),
-          manual_transaction: trans.is_manual
-        };
-      }) || [];
-      
-      setTransactions(mappedTransactions);
+      processTransactions(data);
     } catch (error) {
       console.error('Erro inesperado ao buscar transações:', error);
-      toast.error(`Erro: ${error instanceof Error ? error.message : 'Ocorreu um erro ao buscar as transações'}`);
-    } finally {
+      toast.error('Erro inesperado ao buscar transações');
       setLoading(false);
     }
+  }
+  
+  // Função para processar as transações após buscá-las
+  async function processTransactions(data) {
+    if (!data || data.length === 0) {
+      setTransactions([]);
+      setLoading(false);
+      return;
+    }
+    
+    // Buscar informações dos serviços relacionados
+    const serviceIds = data?.filter(t => t.service_id).map(t => t.service_id) || [];
+    let servicesMap = {};
+    
+    if (serviceIds.length > 0) {
+      const { data: services, error: servicesError } = await supabase
+        .from('services')
+        .select('id, name, type, preco')
+        .in('id', serviceIds);
+        
+      if (servicesError) {
+        console.error('Erro ao buscar serviços:', servicesError);
+      } else {
+        servicesMap = services.reduce((acc, service) => {
+          acc[service.id] = service;
+          return acc;
+        }, {});
+        console.log(`Encontrados ${services.length} serviços relacionados`);
+      }
+    }
+    
+    // Buscar pedidos relacionados
+    const transactionIds = data?.map(t => t.id) || [];
+    let ordersMap = {};
+    
+    if (transactionIds.length > 0) {
+      const { data: orders, error: ordersError } = await supabase
+        .from('core_orders')
+        .select('*')
+        .in('transaction_id', transactionIds);
+        
+      if (ordersError) {
+        console.error('Erro ao buscar pedidos:', ordersError);
+      } else {
+        ordersMap = transactionIds.reduce((acc, transId) => {
+          acc[transId] = orders.filter(order => order.transaction_id === transId);
+          return acc;
+        }, {});
+        console.log(`Encontrados ${orders.length} pedidos relacionados`);
+      }
+    }
+    
+    // Buscar usuários/clientes relacionados
+    const customerIds = data?.filter(t => t.customer_id).map(t => t.customer_id) || [];
+    let customersMap = {};
+    
+    if (customerIds.length > 0) {
+      const { data: customers, error: customersError } = await supabase
+        .from('customers')
+        .select('id, name, email')
+        .in('id', customerIds);
+        
+      if (customersError) {
+        console.error('Erro ao buscar clientes:', customersError);
+      } else if (customers) {
+        customersMap = customers.reduce((acc, customer) => {
+          acc[customer.id] = customer;
+          return acc;
+        }, {});
+        console.log(`Encontrados ${customers.length} clientes relacionados`);
+      }
+    }
+    
+    // Combinar dados
+    const processedTransactions = data.map(transaction => {
+      const orders = ordersMap[transaction.id] || [];
+      const service = transaction.service_id ? servicesMap[transaction.service_id] : null;
+      const customer = transaction.customer_id ? customersMap[transaction.customer_id] : null;
+      
+      return {
+        ...transaction,
+        service: service || undefined,
+        orders: orders.length > 0 ? orders : undefined,
+        customer_name: transaction.customer_name || (customer ? customer.name : undefined),
+        customer_email: transaction.customer_email || (customer ? customer.email : undefined)
+      };
+    });
+    
+    setTransactions(processedTransactions);
+    setLoading(false);
   }
 
   function getStatusBadge(status: string) {

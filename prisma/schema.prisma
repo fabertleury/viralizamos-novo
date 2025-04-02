@@ -99,3 +99,47 @@ model DuplicateDetection {
   @@index([hash_key])
   @@map("duplicate_detection")
 }
+
+// Tabela de notificações para o painel administrativo
+model AdminNotifications {
+  id            String   @id @default(uuid())
+  type          String
+  title         String
+  message       String
+  reference_id  String?
+  transaction_id String?
+  status        String   @default("pending")
+  priority      String   @default("low")
+  metadata      Json?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @default(now())
+
+  @@index([type])
+  @@index([status])
+  @@index([transaction_id])
+  @@map("admin_notifications")
+}
+
+// Tabela para fila de pedidos no painel de administração
+model OrderQueue {
+  id                     String    @id @default(uuid())
+  transaction_id         String
+  service_id             String
+  provider_id            String
+  post_code              String?
+  post_url               String?   @db.Text
+  status                 String
+  priority               Int       @default(0)
+  attempts               Int       @default(0)
+  max_attempts           Int       @default(3)
+  scheduled_for          DateTime  @default(now())
+  processed_at           DateTime?
+  error_message          String?   @db.Text
+  created_at             DateTime  @default(now())
+  updated_at             DateTime  @default(now())
+
+  @@index([status])
+  @@index([transaction_id])
+  @@index([scheduled_for])
+  @@map("order_queue")
+}
