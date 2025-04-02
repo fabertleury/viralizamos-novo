@@ -228,9 +228,9 @@ export default function AdminLayout({
                   <nav className="flex flex-1 flex-col">
                     <ul role="list" className="flex flex-1 flex-col gap-y-7">
                       <li key="mobile-navigation-main">
-                        <ul role="list" className="-mx-2 space-y-1">
+                        <ul role="list" className="-mx-2 space-y-1" key="mobile-navigation-list">
                           {navigation.map((item) => (
-                            <li key={item.name}>
+                            <li key={item.name || item.title}>
                               <Link
                                 href={item.href}
                                 className={classNames(
@@ -248,7 +248,7 @@ export default function AdminLayout({
                                 }) : (
                                   <span className="text-red-500">No Icon</span>
                                 )}
-                                {item.name}
+                                {item.name || item.title}
                                 {item.tag && (
                                   <span className="ml-2 rounded bg-indigo-600 px-2 py-1 text-xs text-white">
                                     {item.tag}
@@ -284,9 +284,9 @@ export default function AdminLayout({
           <nav className="flex flex-1 flex-col">
             <ul role="list" className="flex flex-1 flex-col gap-y-7">
               <li key="navigation-main">
-                <ul role="list" className="-mx-2 space-y-1">
+                <ul role="list" className="-mx-2 space-y-1" key="navigation-list">
                   {navigation.map((item) => (
-                    <li key={item.name}>
+                    <li key={item.name || item.title}>
                       <Link
                         href={item.href}
                         className={classNames(
@@ -304,7 +304,7 @@ export default function AdminLayout({
                         }) : (
                           <span className="text-red-500">No Icon</span>
                         )}
-                        {item.name}
+                        {item.name || item.title}
                         {item.tag && (
                           <span className="ml-2 rounded bg-indigo-600 px-2 py-1 text-xs text-white">
                             {item.tag}
