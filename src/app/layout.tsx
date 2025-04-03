@@ -28,10 +28,20 @@ export const metadata: Metadata = {
 };
 
 // Função para obter o pathname da requisição
-async function getPathname() {
-  const headersList = headers();
-  const pathname = headersList.get('x-pathname');
-  return pathname || '/';
+function getPathname() {
+  try {
+    const headersList = headers();
+    // Verificar múltiplas possíveis fontes do pathname
+    const pathname = 
+      headersList.get('x-pathname') || 
+      headersList.get('x-url')?.split('?')[0] || 
+      '/';
+    
+    return pathname;
+  } catch (error) {
+    console.error('Erro ao obter pathname:', error);
+    return '/';
+  }
 }
 
 export default async function RootLayout({
@@ -39,7 +49,7 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = await getPathname();
+  const pathname = getPathname();
   
   // Se for a rota raiz ou outras rotas públicas, não faz verificação
   if (pathname === '/' || pathname.startsWith('/login') || pathname.startsWith('/register') || pathname.startsWith('/checkout')) {
