@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { Header } from '@/components/layout/header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { formatDateToBrasilia } from '@/lib/utils/date';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Loader2 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 
 interface Refill {
@@ -91,6 +91,19 @@ interface Transaction {
 }
 
 export default function AcompanharPedidoPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-pink-500" />
+        <span className="ml-2 text-xl font-medium">Carregando...</span>
+      </div>
+    }>
+      <AcompanharPedidoContent />
+    </Suspense>
+  );
+}
+
+function AcompanharPedidoContent() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);

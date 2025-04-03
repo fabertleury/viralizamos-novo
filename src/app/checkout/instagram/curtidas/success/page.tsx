@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useSupabase } from '@/lib/hooks/useSupabase';
 import { Loader2 } from 'lucide-react';
@@ -9,6 +9,16 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
 export default function PaymentSuccessPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 flex items-center justify-center">
+      <Loader2 className="w-12 h-12 text-white animate-spin" />
+    </div>}>
+      <PaymentSuccessContent />
+    </Suspense>
+  );
+}
+
+function PaymentSuccessContent() {
   const searchParams = useSearchParams();
   const transactionId = searchParams.get('transaction_id');
   const [status, setStatus] = useState<string>('pending');

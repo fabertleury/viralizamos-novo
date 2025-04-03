@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Header } from '@/components/layout/header';
@@ -8,6 +8,14 @@ import { PostSelector } from '@/components/instagram/curtidas/PostSelector';
 import { InstagramPost } from '@/types/instagram';
 
 export default function Step1Page() {
+  return (
+    <Suspense fallback={<div className="p-8 flex items-center justify-center">Carregando...</div>}>
+      <Step1Content />
+    </Suspense>
+  );
+}
+
+function Step1Content() {
   const [service, setService] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();

@@ -9,13 +9,11 @@ const nextConfig = {
   // Configuração para contornar o erro de build
   output: "standalone",
   experimental: {
-    // Opções experimentais suportadas
-    serverComponentsExternalPackages: [],
-    // Ignorar erros com páginas específicas
-    instrumentationHook: true,
     // Permitir erros de componentes client-side
     optimizeCss: true
   },
+  // Configuração para pacotes externos ao servidor
+  serverExternalPackages: [],
   env: {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,

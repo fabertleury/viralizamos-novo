@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
 import { useInstagramAPI } from '@/hooks/useInstagramAPI';
@@ -57,7 +57,7 @@ interface ProfileData {
   is_private: boolean;
 }
 
-export default function Step1Page() {
+function Step1Content() {
   const [username, setUsername] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -392,5 +392,13 @@ export default function Step1Page() {
         />
       </main>
     </div>
+  );
+}
+
+export default function Step1Page() {
+  return (
+    <Suspense fallback={<div>Carregando...</div>}>
+      <Step1Content />
+    </Suspense>
   );
 }

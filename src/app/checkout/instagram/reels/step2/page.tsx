@@ -15,6 +15,7 @@ import { PaymentPixModal } from '@/components/payment/PaymentPixModal';
 import { CouponInput } from '@/components/checkout/CouponInput';
 import axios from 'axios';
 import { ArrowLeft } from 'lucide-react';
+import { Suspense } from 'react';
 
 // Importar tipos e funções do arquivo de utilitários
 import { 
@@ -27,7 +28,7 @@ import {
   prepareTransactionData
 } from '../utils/reelsUtils';
 
-export default function Step2Page() {
+function ReelsStep2Content() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const username = searchParams.get('username') || '';
@@ -289,7 +290,7 @@ export default function Step2Page() {
   }, [paymentData, router, userProfile, metadata]);
 
   return (
-    <div>
+    <div className="min-h-screen bg-gray-50">
       <Header />
       
       <main className="container mx-auto px-4 py-8">
@@ -474,5 +475,18 @@ export default function Step2Page() {
         />
       )}
     </div>
+  );
+}
+
+export default function Step2Page() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center min-h-screen p-4">
+        <Loader2 className="h-10 w-10 animate-spin text-purple-600 mb-4" />
+        <p className="text-lg text-gray-600">Carregando...</p>
+      </div>
+    }>
+      <ReelsStep2Content />
+    </Suspense>
   );
 }

@@ -1,3 +1,9 @@
+/**
+ * NOTA: A maioria das funcionalidades de verificação de pagamentos foi migrada 
+ * para o microserviço viralizamos_pagamentos. Este arquivo permanece para 
+ * compatibilidade com código legado.
+ */
+
 import { createClient } from '@/lib/supabase/server';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { PaymentStatusManager } from './PaymentStatusManager';
@@ -53,10 +59,7 @@ export class PaymentChecker {
    */
   public static getInstance(): PaymentChecker {
     if (!PaymentChecker.instance) {
-      console.log('Criando nova instância do PaymentChecker');
       PaymentChecker.instance = new PaymentChecker();
-    } else if (PaymentChecker.isInitialized) {
-      console.log('Reusando instância existente do PaymentChecker');
     }
     return PaymentChecker.instance;
   }
@@ -67,17 +70,17 @@ export class PaymentChecker {
   public async startChecking(forceCheck = false): Promise<PaymentCheckerStartResult> {
     // Verificar se já está inicializado
     if (PaymentChecker.isInitialized && !forceCheck) {
-      console.log('PaymentChecker já foi inicializado anteriormente, ignorando solicitação duplicada');
+      this.logger.info('PaymentChecker já foi inicializado anteriormente');
       return { status: 'already_initialized', checked: false };
     }
     
     // Verificar se já está em execução
     if (this.isRunning && !forceCheck) {
-      console.log('PaymentChecker já está em execução, pulando inicialização');
+      this.logger.info('PaymentChecker já está em execução');
       return { status: 'already_running', checked: false };
     }
     
-    console.log('Iniciando PaymentChecker...');
+    this.logger.info('Iniciando PaymentChecker');
     this.isRunning = true;
     PaymentChecker.isInitialized = true;
 
@@ -87,14 +90,13 @@ export class PaymentChecker {
         try {
           await this.checkPendingPayments();
         } catch (error) {
-          console.error('Erro durante verificação programada de pagamentos:', error);
+          this.logger.error('Erro durante verificação programada de pagamentos:', error);
         }
       }, 20000);
     }
 
     // Verificar imediatamente ao iniciar ou se for forçado
     try {
-      console.log(`Realizando verificação inicial${forceCheck ? ' (forçada)' : ''}...`);
       const result = await this.checkPendingPayments();
       return { 
         status: 'success', 
@@ -102,7 +104,7 @@ export class PaymentChecker {
         result: result as unknown as Record<string, unknown> 
       };
     } catch (error) {
-      console.error('Erro ao verificar pagamentos durante inicialização:', error);
+      this.logger.error('Erro ao verificar pagamentos durante inicialização:', error);
       return { status: 'error', checked: false, error: String(error) };
     }
   }
@@ -112,7 +114,7 @@ export class PaymentChecker {
    */
   public stopChecking(): void {
     if (this.checkInterval) {
-      console.log('Parando PaymentChecker...');
+      this.logger.info('Parando PaymentChecker');
       clearInterval(this.checkInterval);
       this.checkInterval = null;
     }
@@ -124,7 +126,7 @@ export class PaymentChecker {
    */
   private async checkPendingPayments(): Promise<PendingPaymentsCheckResult> {
     try {
-      console.log('Verificando pagamentos pendentes...');
+      this.logger.info('Verificando pagamentos pendentes');
       
       // Inicialização do cliente Supabase
       const supabase = createClient();
@@ -140,10 +142,10 @@ export class PaymentChecker {
         .limit(10);
       
       if (error) {
-        console.error('Erro ao buscar transações pendentes:', error.message);
+        this.logger.error('Erro ao buscar transações pendentes:', error.message);
         
         // Tentar buscar na tabela antiga como fallback
-        console.log('Tentando buscar transações na tabela antiga como fallback...');
+        this.logger.info('Tentando buscar transações na tabela antiga como fallback');
         const { data: oldTransactions, error: oldError } = await supabase
           .from('core_transactions')
           .select('*')
@@ -151,18 +153,17 @@ export class PaymentChecker {
           .limit(10);
           
         if (oldError) {
-          console.error('Erro ao buscar transações antigas pendentes:', oldError.message);
+          this.logger.error('Erro ao buscar transações antigas pendentes:', oldError.message);
           return { status: 'error', error: oldError.message };
         }
         
         if (oldTransactions && oldTransactions.length > 0) {
-          console.log(`Encontradas ${oldTransactions.length} transações pendentes na tabela antiga`);
+          this.logger.info(`Encontradas ${oldTransactions.length} transações pendentes na tabela antiga`);
           
           // Processar transações da tabela antiga
           for (const transaction of oldTransactions) {
             // Verificar se já processamos esta transação nesta execução
             if (processedTransactions.has(transaction.id)) {
-              console.log(`Transação ${transaction.id} já foi processada nesta execução, pulando.`);
               continue;
             }
             
@@ -170,7 +171,7 @@ export class PaymentChecker {
             if (transaction.status === 'approved') {
               const attemptCount = this.transactionProcessor.getAttemptCount(transaction.id);
               if (this.transactionProcessor.hasExceededMaxAttempts(transaction.id)) {
-                console.log(`Transação ${transaction.id} já foi verificada ${attemptCount} vezes e está aprovada. Registrando log e pulando.`);
+                this.logger.warn(`Transação ${transaction.id} já foi verificada ${attemptCount} vezes e está aprovada`);
                 
                 // Registrar um log indicando que a transação está aprovada mas não foi processada
                 await supabase.from('core_processing_logs').insert({
@@ -204,14 +205,13 @@ export class PaymentChecker {
         return { status: 'error', error: error.message };
       }
       
-      console.log(`Encontradas ${transactions?.length || 0} transações pendentes`);
+      this.logger.info(`Encontradas ${transactions?.length || 0} transações pendentes`);
       
       // Processar cada transação
       for (const transaction of transactions || []) {
         try {
           // Verificar se já processamos esta transação nesta execução
           if (processedTransactions.has(transaction.id)) {
-            console.log(`Transação ${transaction.id} já foi processada nesta execução, pulando.`);
             continue;
           }
           
@@ -219,7 +219,7 @@ export class PaymentChecker {
           if (transaction.status === 'approved') {
             const attemptCount = this.transactionProcessor.getAttemptCount(transaction.id);
             if (this.transactionProcessor.hasExceededMaxAttempts(transaction.id)) {
-              console.log(`Transação ${transaction.id} já foi verificada ${attemptCount} vezes e está aprovada. Registrando log e pulando.`);
+              this.logger.warn(`Transação ${transaction.id} já foi verificada ${attemptCount} vezes e está aprovada`);
               
               // Registrar um log indicando que a transação está aprovada mas não foi processada
               await supabase.from('core_processing_logs').insert({
@@ -246,13 +246,13 @@ export class PaymentChecker {
           // Processar a transação
           await this.transactionProcessor.processTransaction(transaction as TransactionType);
         } catch (transactionError) {
-          console.error(`Erro ao processar transação:`, transactionError);
+          this.logger.error(`Erro ao processar transação:`, transactionError);
         }
       }
       
       return { status: 'success', processed: transactions?.length || 0 };
     } catch (error) {
-      console.error('Erro ao verificar pagamentos pendentes:', error);
+      this.logger.error('Erro ao verificar pagamentos pendentes:', error);
       return { status: 'error', error: String(error) };
     }
   }

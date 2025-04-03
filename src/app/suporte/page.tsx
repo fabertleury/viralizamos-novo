@@ -7,6 +7,8 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import { Suspense } from 'react';
+import { Loader2 } from 'lucide-react';
 
 interface Ticket {
   id: string;
@@ -26,7 +28,7 @@ interface Ticket {
   }[];
 }
 
-export default function SupportPage() {
+function SuporteContent() {
   const searchParams = useSearchParams();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
@@ -383,5 +385,18 @@ export default function SupportPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function SupportPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center min-h-screen p-4">
+        <Loader2 className="h-10 w-10 animate-spin text-purple-600 mb-4" />
+        <p className="text-lg text-gray-600">Carregando...</p>
+      </div>
+    }>
+      <SuporteContent />
+    </Suspense>
   );
 }

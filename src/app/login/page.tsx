@@ -1,13 +1,29 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { toast } from 'sonner'; // Import the toast function
+import { Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center relative">
+        <div className="absolute inset-0 bg-black opacity-50" />
+        <div className="relative z-10 flex items-center justify-center">
+          <Loader2 className="h-12 w-12 animate-spin text-white" />
+        </div>
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
+  );
+}
+
+function LoginContent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);

@@ -16,6 +16,8 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { createClient } from '@/lib/supabase/client';
 import { ProfileVerificationModal } from '@/components/modals/ProfileVerificationModal';
+import { Suspense } from 'react';
+import { Loader2 } from 'lucide-react';
 
 interface ServiceDetail {
   title: string;
@@ -57,7 +59,7 @@ interface ProfileData {
   is_private: boolean;
 }
 
-export default function Step1Page() {
+function ComentariosStep1Content() {
   const [username, setUsername] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -389,5 +391,18 @@ export default function Step1Page() {
         />
       </main>
     </div>
+  );
+}
+
+export default function Step1Page() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center min-h-screen p-4">
+        <Loader2 className="h-10 w-10 animate-spin text-purple-600 mb-4" />
+        <p className="text-lg text-gray-600">Carregando...</p>
+      </div>
+    }>
+      <ComentariosStep1Content />
+    </Suspense>
   );
 }

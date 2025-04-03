@@ -1,10 +1,26 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { InstagramPostsReelsStep2 } from '@/components/checkout/InstagramPostsReelsStep2';
+import { Loader2 } from 'lucide-react';
 
 export default function ReelsStep2Page() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-purple-600 mx-auto mb-4" />
+          <h2 className="text-xl font-medium text-gray-700">Carregando...</h2>
+        </div>
+      </div>
+    }>
+      <ReelsStep2Content />
+    </Suspense>
+  );
+}
+
+function ReelsStep2Content() {
   const searchParams = useSearchParams();
 
   useEffect(() => {

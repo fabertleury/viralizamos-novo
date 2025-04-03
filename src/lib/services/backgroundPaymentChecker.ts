@@ -3,6 +3,9 @@
  * 
  * Este arquivo serve como uma camada de compatibilidade para a migração
  * do BackgroundPaymentChecker para o novo sistema modular.
+ * 
+ * NOTA: A maioria das funcionalidades foi migrada para microserviços dedicados.
+ * Este wrapper permanece para compatibilidade com código legado.
  */
 
 import { PaymentChecker } from './payment/PaymentChecker';
@@ -24,7 +27,7 @@ export class BackgroundPaymentChecker {
 
   public static getInstance(): BackgroundPaymentChecker {
     if (!BackgroundPaymentChecker.instance) {
-      console.log('Criando nova instância do BackgroundPaymentChecker (V2)');
+      // Log removido - funcionalidade migrada para microserviço
       BackgroundPaymentChecker.instance = new BackgroundPaymentChecker();
     }
     return BackgroundPaymentChecker.instance;
@@ -87,7 +90,7 @@ export type {
  */
 export async function processApprovedPayments(): Promise<{ success: boolean; message?: string; error?: string }> {
   try {
-    console.log('Iniciando processamento de pagamentos aprovados manualmente...');
+    // Log reduzido - funcionalidade migrada para microserviço
     
     const supabase = createClient();
     
@@ -105,11 +108,8 @@ export async function processApprovedPayments(): Promise<{ success: boolean; mes
     }
     
     if (!transactions || transactions.length === 0) {
-      console.log('Nenhuma transação aprovada pendente de processamento.');
       return { success: true, message: 'Nenhuma transação pendente' };
     }
-    
-    console.log(`Encontradas ${transactions.length} transações aprovadas para processamento.`);
     
     // Verificar posts selecionados por transação para análise prévia
     const transactionPostsDetails = [];
@@ -130,10 +130,7 @@ export async function processApprovedPayments(): Promise<{ success: boolean; mes
             selectedPosts: posts.length,  // Todos os posts são considerados selecionados
             hasSelectedPosts: true  // Se houver posts, eles são considerados selecionados
           });
-          
-          console.log(`Transação ${transaction.id}: ${posts.length} posts totais (todos serão processados)`);
         } else {
-          console.log(`Transação ${transaction.id}: Nenhum post associado`);
           transactionPostsDetails.push({
             transactionId: transaction.id,
             totalPosts: 0,
@@ -158,13 +155,8 @@ export async function processApprovedPayments(): Promise<{ success: boolean; mes
         .neq('status', 'error');
         
       if (!countError && count && count > 0) {
-        console.log(`Transação ${transactionId} já tem ${count} ordens existentes`);
         transactionsWithOrders.add(transactionId);
       }
-    }
-    
-    if (transactionsWithOrders.size > 0) {
-      console.log(`Encontradas ${transactionsWithOrders.size} transações que já têm ordens existentes`);
     }
     
     // Processar cada transação
@@ -179,8 +171,6 @@ export async function processApprovedPayments(): Promise<{ success: boolean; mes
       try {
         // Verificar se a transação já tem ordens
         if (transactionsWithOrders.has(transaction.id)) {
-          console.log(`Transação ${transaction.id} já tem ordens existentes. Marcando como processada.`);
-          
           // Atualizar o status order_created para true
           await supabase
             .from('core_transactions_v2')
@@ -199,15 +189,11 @@ export async function processApprovedPayments(): Promise<{ success: boolean; mes
         
         if (postsDetail && postsDetail.totalPosts === 0) {
           console.warn(`⚠️ ATENÇÃO: Transação ${transaction.id} não tem posts associados!`);
-          console.log(`Verificar se há um problema na criação dos posts para esta transação.`);
         }
-        
-        console.log(`Processando transação ${transaction.id}...`);
         
         const result = await transactionProcessor.processTransaction(transaction);
         
         if (result && result.status === 'processed') {
-          console.log(`Transação ${transaction.id} processada com sucesso!`);
           processedCount++;
         } else {
           console.warn(`Transação ${transaction.id} não foi processada: ${result?.reason || 'Razão desconhecida'}`);
@@ -224,14 +210,7 @@ export async function processApprovedPayments(): Promise<{ success: boolean; mes
     
     // Processar pedidos pendentes para envio ao provedor apenas uma vez após todas as transações
     if (processedCount > 0) {
-      console.log('Processando pedidos pendentes (uma única vez para todas as transações)...');
       const processingResult = await orderProcessor.processPendingOrders();
-      
-      console.log(`Resultado do processamento de pedidos pendentes: ${
-        processingResult.success 
-          ? `${processingResult.success_count || 0} com sucesso, ${processingResult.error_count || 0} com erro` 
-          : `Falha: ${processingResult.error || 'Erro desconhecido'}`
-      }`);
     }
     
     return { 

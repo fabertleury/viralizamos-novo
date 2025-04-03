@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { toast } from 'sonner';
 import { useSearchParams } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { SocialIcon } from '@/components/ui/social-icon';
 import { FeaturedServiceCard } from '@/components/featured-service-card';
 import { Header } from '@/components/layout/header';
+import { Loader2 } from 'lucide-react';
 
 interface Social {
   id: string;
@@ -63,6 +64,24 @@ interface Service {
 }
 
 export default function ServicesPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen">
+        <Header />
+        <div className="container mx-auto px-4 py-8 flex items-center justify-center">
+          <div className="text-center">
+            <Loader2 className="h-12 w-12 animate-spin text-pink-500 mx-auto mb-4" />
+            <h2 className="text-xl font-medium text-gray-700">Carregando serviços...</h2>
+          </div>
+        </div>
+      </div>
+    }>
+      <ServicesContent />
+    </Suspense>
+  );
+}
+
+function ServicesContent() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [socials, setSocials] = useState<Social[]>([]);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useInstagramAPI } from '@/hooks/useInstagramAPI';
 import { toast } from 'sonner';
@@ -15,6 +15,7 @@ import { FaSpinner, FaPlus, FaHeart, FaWhatsapp } from 'react-icons/fa';
 import { Header } from '@/components/layout/header';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Loader2 } from 'lucide-react';
 
 interface ProfileData {
   username?: string;
@@ -87,6 +88,24 @@ function calculateEngagementProjection(
 }
 
 export default function ProfileAnalyzerPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <Header />
+        <div className="container mx-auto px-4 py-8 flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <Loader2 className="h-12 w-12 animate-spin text-pink-500 mx-auto mb-4" />
+            <h2 className="text-xl font-medium text-gray-700">Carregando análise de perfil...</h2>
+          </div>
+        </div>
+      </div>
+    }>
+      <ProfileAnalyzerContent />
+    </Suspense>
+  );
+}
+
+function ProfileAnalyzerContent() {
   const [username, setUsername] = useState('');
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [contentData, setContentData] = useState<ContentData[]>([]);
