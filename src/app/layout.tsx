@@ -8,11 +8,11 @@ import { redirect } from 'next/navigation';
 import Script from 'next/script';
 import ClientLayout from '@/components/layout/ClientLayout';
 
-// Importar arquivo de inicialização de serviços em background
-// Este import garante que os serviços sejam inicializados 
-// automaticamente quando o servidor iniciar
+// Inicialização controlada para evitar duplicação
 if (typeof window === 'undefined') {
-  import('@/lib/services/startup');
+  import('@/lib/services/startup').then(module => {
+    module.ensureStartupServicesLoaded();
+  });
 }
 
 const inter = Inter({ subsets: ['latin'] });
@@ -30,7 +30,8 @@ export const metadata: Metadata = {
 // Função para obter o pathname da requisição
 async function getPathname() {
   const headersList = headers();
-  return await headersList.get('x-pathname') || '/';
+  const pathname = headersList.get('x-pathname');
+  return pathname || '/';
 }
 
 export default async function RootLayout({
