@@ -114,7 +114,10 @@ export function PaymentPixModal({
         profile: profileData.username
       });
 
-      // Construir a URL de pagamento
+      // Construir a URL de pagamento com parâmetros para redirecionamento após o pagamento
+      const currentUrl = window.location.origin;
+      const returnUrl = `${currentUrl}/agradecimento`;
+      
       const paymentUrl = `${serviceUrl}/pagamento/pix?` + new URLSearchParams({
         amount: amount.toString(),
         service_id: serviceId,
@@ -122,7 +125,7 @@ export function PaymentPixModal({
         customer_email: customerData?.email || '',
         customer_name: customerData?.name || '',
         service_name: serviceName || '',
-        return_url: window.location.href
+        return_url: returnUrl
       }).toString();
 
       // Redirecionar para a página de pagamento
