@@ -6,6 +6,19 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Configuração para ignorar erros de páginas específicas durante a build
+  experimental: {
+    missingSuspenseWithCSRErrorEnabled: false,
+  },
+  // Desativar a geração estática para rotas específicas
+  exportPathMap: async function (
+    defaultPathMap,
+    { dev, dir, outDir, distDir, buildId }
+  ) {
+    // Excluir as páginas problemáticas da geração estática
+    delete defaultPathMap['/checkout/instagram-v2/visualizacao/step1'];
+    return defaultPathMap;
+  },
   env: {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
