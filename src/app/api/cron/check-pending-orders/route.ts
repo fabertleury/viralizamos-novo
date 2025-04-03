@@ -1,31 +1,25 @@
 import { NextResponse } from 'next/server';
 import { Logger } from '@/lib/core/utils/logger';
-import { backgroundOrderProcessor } from '@/lib/services/backgroundOrderProcessor';
 
 const logger = new Logger('check-pending-orders');
 
 // Handler para solicitações GET
 export async function GET() {
-  try {
-    logger.info('Iniciando processamento de pedidos pendentes via endpoint...');
-    
-    // Usar o processador em background já inicializado
-    const result = await backgroundOrderProcessor.processPendingOrders();
-    
-    logger.info(`Processamento concluído: ${JSON.stringify(result)}`);
-    
-    return NextResponse.json({
-      success: true,
-      message: 'Pedidos pendentes processados com sucesso',
-      result
-    });
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-    logger.error(`Erro ao processar pedidos pendentes: ${errorMessage}`);
-    
-    return NextResponse.json({
-      success: false,
-      message: `Erro ao processar pedidos pendentes: ${errorMessage}`
-    }, { status: 500 });
-  }
+  logger.info('Endpoint check-pending-orders foi acessado');
+  
+  // Informar que a funcionalidade foi migrada para o microserviço de orders
+  logger.warn('Este endpoint foi descontinuado no serviço principal');
+  logger.info('A funcionalidade de processamento de pedidos foi migrada para o microserviço viralizamos_orders');
+  logger.info('Por favor, acesse: https://orders.viralizamos.com/api/cron/check-pending-orders');
+  
+  // Retornar resposta informando sobre a migração
+  return NextResponse.json({
+    success: false,
+    message: 'Endpoint descontinuado no serviço principal',
+    migration: {
+      status: 'migrated',
+      microservice: 'viralizamos_orders',
+      endpoint: 'https://orders.viralizamos.com/api/cron/check-pending-orders'
+    }
+  }, { status: 410 }); // Status 410 Gone
 } 

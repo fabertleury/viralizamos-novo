@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BackgroundServices } from '@/lib/services/backgroundServices';
 import { createClient } from '@/lib/supabase/server';
+import { Logger } from '@/lib/core/utils/logger';
+
+const logger = new Logger('init-services');
 
 /**
  * API que pode ser chamada para inicializar serviços de background
  * Útil para garantir que os serviços estão rodando em ambientes serverless como Railway
+ * Nota: Os processadores de pagamento e pedidos foram migrados para seus respectivos microserviços
  */
 export async function GET(request: NextRequest) {
   try {
@@ -15,9 +19,12 @@ export async function GET(request: NextRequest) {
     // Se um código de autorização está definido nas variáveis de ambiente,
     // mas nenhum foi fornecido ou está incorreto, retornar erro
     if (authKey && (!apiKey || apiKey !== authKey)) {
-      console.log('Tentativa de acesso não autorizado à API de inicialização de serviços');
+      logger.warn('Tentativa de acesso não autorizado à API de inicialização de serviços');
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
+
+    logger.info('Inicializando serviços de background no serviço principal');
+    logger.info('Nota: Os processadores de pagamento e pedidos foram migrados para seus microserviços específicos');
 
     // Registrar a execução
     const supabase = createClient();
@@ -37,13 +44,30 @@ export async function GET(request: NextRequest) {
     // Obter serviços ativos
     const activeServices = backgroundServices.getActiveServices();
 
-    return NextResponse.json({
+    // Adicionar informações sobre os serviços migrados
+    const response = {
       success: true,
       message: 'Serviços de background verificados e inicializados',
-      active_services: activeServices
-    });
+      active_services: activeServices,
+      migrated_services: [
+        {
+          name: 'backgroundOrderProcessor',
+          status: 'migrated',
+          microservice: 'viralizamos_orders',
+          endpoint: 'https://orders.viralizamos.com'
+        },
+        {
+          name: 'backgroundPaymentChecker',
+          status: 'migrated',
+          microservice: 'viralizamos_pagamentos',
+          endpoint: 'https://payments.viralizamos.com'
+        }
+      ]
+    };
+
+    return NextResponse.json(response);
   } catch (error) {
-    console.error('Erro ao inicializar serviços de background:', error);
+    logger.error('Erro ao inicializar serviços de background:', error);
     
     // Tentar gravar o erro no log
     try {
@@ -57,7 +81,7 @@ export async function GET(request: NextRequest) {
         }
       });
     } catch (logError) {
-      console.error('Erro adicional ao registrar falha:', logError);
+      logger.error('Erro adicional ao registrar falha:', logError);
     }
 
     return NextResponse.json(

@@ -1,36 +1,21 @@
 /**
- * Este arquivo é carregado automaticamente no início da aplicação
- * e garante que todos os processadores em background sejam inicializados
+ * Este arquivo foi modificado para não inicializar mais os processadores em background
+ * que agora são responsabilidade dos microserviços dedicados
  */
 
 import { Logger } from '@/lib/core/utils/logger';
 const logger = new Logger('ServerStartup');
 
-// Importar os serviços em background apenas no lado do servidor
+// Informações apenas no lado do servidor
 if (typeof window === 'undefined') {
-  logger.info('🚀 Inicializando serviços em background no início do servidor...');
+  logger.info('🚀 Iniciando servidor principal...');
   
-  try {
-    // Importar processador de pagamentos
-    logger.info('Carregando módulo backgroundPaymentChecker...');
-    import('./backgroundPaymentChecker')
-      .then(() => logger.success('✅ Processador de pagamentos carregado'))
-      .catch((error) => logger.error(`❌ Erro ao carregar processador de pagamentos: ${error.message}`));
-  } catch (error) {
-    logger.error(`❌ Erro ao carregar processador de pagamentos: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
-  }
+  // Informação sobre a migração dos processadores para microserviços
+  logger.info('ℹ️ Os processadores de background foram migrados para microserviços dedicados:');
+  logger.info('ℹ️ • Processamento de pagamentos → microserviço viralizamos_pagamentos');
+  logger.info('ℹ️ • Processamento de pedidos → microserviço viralizamos_orders');
   
-  try {
-    // Importar processador de pedidos
-    logger.info('Carregando módulo backgroundOrderProcessor...');
-    import('./backgroundOrderProcessor')
-      .then(() => logger.success('✅ Processador de pedidos carregado'))
-      .catch((error) => logger.error(`❌ Erro ao carregar processador de pedidos: ${error.message}`));
-  } catch (error) {
-    logger.error(`❌ Erro ao carregar processador de pedidos: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
-  }
-  
-  logger.success('✅ Todos os serviços em background foram carregados com sucesso');
+  logger.success('✅ Servidor principal inicializado com sucesso');
 }
 
 // Exportar uma função para garantir que este arquivo não seja removido
