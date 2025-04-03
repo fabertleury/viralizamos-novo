@@ -27,29 +27,13 @@ export const metadata: Metadata = {
   }
 };
 
-// Função para obter o pathname da requisição
-function getPathname() {
-  try {
-    const headersList = headers();
-    // Verificar múltiplas possíveis fontes do pathname
-    const pathname = 
-      headersList.get('x-pathname') || 
-      headersList.get('x-url')?.split('?')[0] || 
-      '/';
-    
-    return pathname;
-  } catch (error) {
-    console.error('Erro ao obter pathname:', error);
-    return '/';
-  }
-}
-
 export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = getPathname();
+  // Usar um valor padrão para o pathname em vez de tentar obtê-lo dos headers
+  const pathname = '/';
   
   // Se for a rota raiz ou outras rotas públicas, não faz verificação
   if (pathname === '/' || pathname.startsWith('/login') || pathname.startsWith('/register') || pathname.startsWith('/checkout')) {
