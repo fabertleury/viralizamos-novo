@@ -29,7 +29,10 @@
     "db:generate": "prisma generate",
     "db:apply-admin-functions": "npx tsx scripts/apply-admin-functions.ts",
     "setup-monitoring": "node scripts/apply-monitoring-tables.js",
-    "monitor": "ts-node -r tsconfig-paths/register src/scripts/system-monitor.ts"
+    "monitor": "ts-node -r tsconfig-paths/register src/scripts/system-monitor.ts",
+    "use:local": "node switch-env.js local",
+    "use:prod": "node switch-env.js prod",
+    "start:all": "concurrently \"npm run dev\" \"cd ../viralizamos_pagamentos && npm run dev\" \"cd ../viralizamos_orders && npm run dev\""
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^6.7.2",
@@ -105,6 +108,7 @@
     "@types/react": "^19",
     "@types/react-beautiful-dnd": "^13.1.8",
     "@types/react-dom": "^19",
+    "concurrently": "^8.2.2",
     "eslint": "^9",
     "eslint-config-next": "15.1.6",
     "supabase": "^2.9.6",
