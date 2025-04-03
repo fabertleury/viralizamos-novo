@@ -261,8 +261,13 @@ export async function POST(request: NextRequest) {
 
     // Registrar a transação no sistema de monitoramento
     if (transaction && transaction.length > 0) {
-      await transactionMonitoring.logTransaction(transaction[0]);
-      console.log(`Transação ${transaction[0].id} registrada no sistema de monitoramento`);
+      // Garantir que o status seja passado corretamente
+      const transactionData = {
+        ...transaction[0],
+        status: 'pending' // Forçar o status como 'pending' para garantir
+      };
+      await transactionMonitoring.logTransaction(transactionData);
+      console.log(`Transação ${transaction[0].id} registrada no sistema de monitoramento com status 'pending'`);
     }
 
     // Se o pagamento foi aprovado, processar a transação

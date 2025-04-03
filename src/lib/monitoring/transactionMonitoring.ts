@@ -10,11 +10,17 @@ export class TransactionMonitoring {
    */
   async logTransaction(transaction: any): Promise<boolean> {
     try {
+      // Garantir que o status está sendo salvo corretamente
+      const status = transaction.status || 'unknown';
+      
+      // Log adicional para debug
+      console.log(`[TransactionMonitoring] Registrando transação ${transaction.id} com status ${status}`);
+      
       await prisma.transactionsLog.create({
         data: {
           id: transaction.id,
-          payment_id: transaction.payment_id || null,
-          status: transaction.status || null,
+          payment_id: transaction.payment_id || transaction.payment_external_reference || null,
+          status: status,
           amount: transaction.amount ? parseFloat(transaction.amount) : null,
           created_at: transaction.created_at ? new Date(transaction.created_at) : new Date(),
           metadata: transaction.metadata || null,
@@ -22,7 +28,7 @@ export class TransactionMonitoring {
         }
       });
       
-      logger.info(`[Monitor] Transação ${transaction.id} registrada no banco de monitoramento`);
+      logger.info(`[Monitor] Transação ${transaction.id} registrada no banco de monitoramento com status ${status}`);
       return true;
     } catch (error) {
       logger.error(`[Monitor] Erro ao registrar transação no banco de monitoramento: ${error instanceof Error ? error.message : String(error)}`);

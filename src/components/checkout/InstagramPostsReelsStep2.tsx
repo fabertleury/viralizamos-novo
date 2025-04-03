@@ -98,6 +98,7 @@ export function InstagramPostsReelsStep2({ serviceType, title }: InstagramPostsR
   const [isMobile, setIsMobile] = useState(false);
   // Referência para rolar para a seção de pagamento
   const paymentSectionRef = useRef<HTMLDivElement>(null);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
   console.log('⚙️ Iniciando componente InstagramPostsReelsStep2 com serviceType:', serviceType);
 
@@ -1665,6 +1666,87 @@ export function InstagramPostsReelsStep2({ serviceType, title }: InstagramPostsR
     );
   };
 
+  const handleCheckout = async () => {
+    try {
+      // Validar seleção de posts ou reels
+      if (selectedItemsCount === 0) {
+        toast.error('Selecione pelo menos um post ou reel para continuar');
+        return;
+      }
+      
+      // Validar quantidade de itens selecionados
+      if (selectedItemsCount > maxTotalItems) {
+        toast.error(`Você pode selecionar no máximo ${maxTotalItems} itens no total`);
+        return;
+      }
+      
+      // Validar formulário de contato
+      if (!formData.name || !formData.email || !formData.phone) {
+        toast.error('Preencha todos os campos do formulário de contato');
+        return;
+      }
+      
+      // Validar email
+      if (!formData.email.includes('@') || !formData.email.includes('.')) {
+        toast.error('Email inválido');
+        return;
+      }
+      
+      // Verificar se tem serviço selecionado
+      if (!service) {
+        toast.error('Serviço não encontrado');
+        return;
+      }
+      
+      setLoading(true);
+      
+      // Preparar informações de posts/reels selecionados
+      const selectedPostsData = selectedPosts.map(post => ({
+        id: post.id,
+        code: post.code || post.shortcode || post.id,
+        image_url: post.image_url || post.thumbnail_url || post.display_url,
+        like_count: post.like_count || 0,
+        comment_count: post.comment_count || 0,
+        is_reel: false
+      }));
+      
+      const selectedReelsData = selectedReels.map(reel => ({
+        id: reel.id,
+        code: reel.code || reel.shortcode || reel.id,
+        image_url: reel.image_url || reel.thumbnail_url || reel.display_url,
+        view_count: reel.view_count || 0,
+        is_reel: true
+      }));
+      
+      // Preparar dados do perfil
+      const profileInfo = {
+        username: profileData?.username || '',
+        full_name: profileData?.full_name || '',
+        follower_count: profileData?.follower_count || 0,
+        is_private: profileData?.is_private || false
+      };
+      
+      // Calcular valor final do serviço
+      const serviceAmount = finalAmount || service.preco || 0;
+      const serviceAmountInCents = Math.round(serviceAmount * 100);
+      
+      // Abrir modal de pagamento
+      setPaymentData({
+        qrCodeText: '',
+        paymentId: '',
+        amount: serviceAmountInCents,
+        qrCodeBase64: ''
+      });
+      
+      setIsPaymentModalOpen(true);
+      setLoading(false);
+    } catch (error) {
+      console.error('Erro ao processar checkout:', error);
+      toast.error('Ocorreu um erro ao processar o checkout. Tente novamente.');
+      setLoading(false);
+    }
+  };
+
   return (
     <div>
       <Header />
@@ -2028,7 +2110,7 @@ export function InstagramPostsReelsStep2({ serviceType, title }: InstagramPostsR
                     
                     <div className="flex items-center justify-center mt-4">
                       <button 
-                        onClick={() => handleSubmit()}
+                        onClick={() => handleCheckout()}
                         disabled={loading || selectedItemsCount === 0 || !formData.name || !formData.email || !formData.phone}
                         className={`
                           px-6 py-3 rounded-full font-bold text-sm uppercase tracking-wider 
@@ -2061,15 +2143,15 @@ export function InstagramPostsReelsStep2({ serviceType, title }: InstagramPostsR
       {paymentData ? (
         <div className="mt-6">
           <PaymentPixModal
-            qrCodeText={paymentData.qrCodeText}
-            qrCodeBase64={paymentData.qrCodeBase64}
-            amount={paymentData.amount}
-            paymentId={paymentData.paymentId}
-            onClose={() => setPaymentData(null)}
             isOpen={!!paymentData}
+            onClose={() => setPaymentData(null)}
             serviceId={service?.id}
             serviceName={service?.name}
-            reused={paymentData.reused}
+            amount={paymentData.amount}
+            customerData={formData}
+            profileData={profileData}
+            postsData={[...selectedPosts, ...selectedReels]}
+            targetProfileLink={`https://instagram.com/${profileData?.username || ''}`}
           />
         </div>
       ) : null}

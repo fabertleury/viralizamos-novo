@@ -94,63 +94,91 @@ export default function MonitoringDashboard() {
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [duplicates, setDuplicates] = useState<Duplicate[]>([]);
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
-  const [statsData, setStatsData] = useState<any>({});
+  const [statsData, setStatsData] = useState<Record<string, any>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [timeRange, setTimeRange] = useState('24h');
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [syncingTransactions, setSyncingTransactions] = useState(false);
 
   // Função para carregar dados
-  useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      try {
-        // Buscar dados de transações
-        const transactionsResponse = await fetch(`/api/admin/monitoring/transactions?timeRange=${timeRange}`);
-        const transactionsData = await transactionsResponse.json();
-        setTransactions(transactionsData.transactions || []);
-        
-        // Buscar dados de pedidos
-        const ordersResponse = await fetch(`/api/admin/monitoring/orders?timeRange=${timeRange}`);
-        const ordersData = await ordersResponse.json();
-        setOrders(ordersData.orders || []);
-        
-        // Buscar dados de integrações
-        const integrationsResponse = await fetch(`/api/admin/monitoring/integrations?timeRange=${timeRange}`);
-        const integrationsData = await integrationsResponse.json();
-        setIntegrations(integrationsData.integrations || []);
-        
-        // Buscar dados de duplicações
-        const duplicatesResponse = await fetch(`/api/admin/monitoring/duplicates?timeRange=${timeRange}`);
-        const duplicatesData = await duplicatesResponse.json();
-        setDuplicates(duplicatesData.duplicates || []);
-        
-        // Buscar dados de webhooks
-        const webhooksResponse = await fetch(`/api/admin/monitoring/webhooks?timeRange=${timeRange}`);
-        const webhooksData = await webhooksResponse.json();
-        setWebhooks(webhooksData.webhooks || []);
-        
-        // Buscar estatísticas
-        const statsResponse = await fetch(`/api/admin/monitoring/stats?timeRange=${timeRange}`);
-        const statsData = await statsResponse.json();
-        setStatsData(statsData);
-        
-      } catch (error) {
-        console.error('Erro ao carregar dados:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const fetchData = async () => {
+    setIsLoading(true);
+    try {
+      // Buscar dados de transações
+      const transactionsResponse = await fetch(`/api/admin/monitoring/transactions?timeRange=${timeRange}`);
+      const transactionsData = await transactionsResponse.json();
+      setTransactions(transactionsData.transactions || []);
+      
+      // Buscar dados de pedidos
+      const ordersResponse = await fetch(`/api/admin/monitoring/orders?timeRange=${timeRange}`);
+      const ordersData = await ordersResponse.json();
+      setOrders(ordersData.orders || []);
+      
+      // Buscar dados de integrações
+      const integrationsResponse = await fetch(`/api/admin/monitoring/integrations?timeRange=${timeRange}`);
+      const integrationsData = await integrationsResponse.json();
+      setIntegrations(integrationsData.integrations || []);
+      
+      // Buscar dados de duplicações
+      const duplicatesResponse = await fetch(`/api/admin/monitoring/duplicates?timeRange=${timeRange}`);
+      const duplicatesData = await duplicatesResponse.json();
+      setDuplicates(duplicatesData.duplicates || []);
+      
+      // Buscar dados de webhooks
+      const webhooksResponse = await fetch(`/api/admin/monitoring/webhooks?timeRange=${timeRange}`);
+      const webhooksData = await webhooksResponse.json();
+      setWebhooks(webhooksData.webhooks || []);
+      
+      // Buscar estatísticas
+      const statsResponse = await fetch(`/api/admin/monitoring/stats?timeRange=${timeRange}`);
+      const statsData = await statsResponse.json();
+      setStatsData(statsData);
+      
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  // Função para sincronizar transações
+  const syncTransactions = async () => {
+    setSyncingTransactions(true);
+    try {
+      const response = await fetch('/api/admin/monitoring/sync-transactions', {
+        method: 'POST'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        alert(`Sincronização concluída! ${data.synced} transações sincronizadas.`);
+        // Recarregar dados
+        fetchData();
+      } else {
+        const error = await response.json();
+        alert(`Erro ao sincronizar: ${error.message || 'Erro desconhecido'}`);
+      }
+    } catch (error) {
+      alert(`Erro ao sincronizar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      console.error('Erro na sincronização:', error);
+    } finally {
+      setSyncingTransactions(false);
+    }
+  };
+
+  // Efeito para carregar dados iniciais
+  useEffect(() => {
     fetchData();
   }, [timeRange]);
 
   // Preparar dados para gráficos
-  const transactionStatusChart = statsData.transactionsByStatus?.map((item: any) => ({
+  const transactionStatusChart = statsData.transactionsByStatus?.map((item: Record<string, any>) => ({
     name: item.status || 'unknown',
     count: item.count
   })) || [];
 
-  const ordersByProviderChart = statsData.ordersByProvider?.map((item: any) => ({
+  const ordersByProviderChart = statsData.ordersByProvider?.map((item: Record<string, any>) => ({
     name: item.provider_id || 'unknown',
     count: item.count
   })) || [];
@@ -158,6 +186,36 @@ export default function MonitoringDashboard() {
   const duplicatesTrendChart = statsData.duplicatesTrend || [];
   
   const webhookPerformanceChart = statsData.webhookPerformance || [];
+
+  // Função para filtrar transações por status
+  const getFilteredTransactions = () => {
+    return transactions.filter(tx => {
+      // Aplicar filtro de pesquisa
+      const matchesSearch = searchTerm === '' || 
+        tx.id.includes(searchTerm) || 
+        (tx.payment_id && tx.payment_id.includes(searchTerm));
+      
+      // Aplicar filtro de status
+      const matchesStatus = statusFilter === 'all' || tx.status === statusFilter;
+      
+      return matchesSearch && matchesStatus;
+    });
+  };
+
+  // Botões com estilo rosa padrão do site
+  const StyledButton = ({ children, onClick, disabled, active, className = "" }) => (
+    <Button 
+      onClick={onClick}
+      disabled={disabled}
+      className={`transition-all duration-300 ease-in-out ${
+        active 
+          ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white' 
+          : 'bg-white hover:bg-gray-100 text-gray-800'
+      } ${className}`}
+    >
+      {children}
+    </Button>
+  );
 
   return (
     <div className="container mx-auto py-10 space-y-8">
@@ -167,26 +225,26 @@ export default function MonitoringDashboard() {
           Monitore transações, pedidos, integrações e problemas de duplicação em tempo real
         </p>
         
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center flex-wrap gap-2">
           <div className="flex gap-2">
-            <Button 
-              variant={timeRange === '24h' ? 'default' : 'outline'} 
+            <StyledButton 
               onClick={() => setTimeRange('24h')}
+              active={timeRange === '24h'}
             >
               24 horas
-            </Button>
-            <Button 
-              variant={timeRange === '7d' ? 'default' : 'outline'} 
+            </StyledButton>
+            <StyledButton 
               onClick={() => setTimeRange('7d')}
+              active={timeRange === '7d'}
             >
               7 dias
-            </Button>
-            <Button 
-              variant={timeRange === '30d' ? 'default' : 'outline'} 
+            </StyledButton>
+            <StyledButton 
               onClick={() => setTimeRange('30d')}
+              active={timeRange === '30d'}
             >
               30 dias
-            </Button>
+            </StyledButton>
           </div>
           
           <div className="flex gap-2">
@@ -196,12 +254,21 @@ export default function MonitoringDashboard() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-64"
             />
+            
+            <StyledButton 
+              onClick={syncTransactions}
+              disabled={syncingTransactions}
+              active={true}
+              className="font-medium"
+            >
+              {syncingTransactions ? 'Sincronizando...' : 'Sincronizar Transações'}
+            </StyledButton>
           </div>
         </div>
       </div>
       
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Stats Overview */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total de Transações</CardTitle>
@@ -251,81 +318,94 @@ export default function MonitoringDashboard() {
         </Card>
       </div>
       
-      {/* Tabs for different data views */}
+      {/* Tabs for different data views - com estilo customizado */}
       <Tabs defaultValue="dashboard" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-          <TabsTrigger value="transactions">Transações</TabsTrigger>
-          <TabsTrigger value="orders">Pedidos</TabsTrigger>
-          <TabsTrigger value="integrations">Integrações</TabsTrigger>
-          <TabsTrigger value="duplicates">Duplicações</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-5 mb-6 bg-transparent p-0 rounded-lg">
+          {['dashboard', 'transactions', 'orders', 'integrations', 'duplicates'].map((tab) => (
+            <TabsTrigger 
+              key={tab} 
+              value={tab}
+              className={`py-3 data-[state=active]:shadow-md data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white font-medium rounded-lg`}
+            >
+              {tab === 'dashboard' && 'Dashboard'}
+              {tab === 'transactions' && 'Transações'}
+              {tab === 'orders' && 'Pedidos'}
+              {tab === 'integrations' && 'Integrações'}
+              {tab === 'duplicates' && 'Duplicações'}
+            </TabsTrigger>
+          ))}
         </TabsList>
         
         {/* Dashboard Tab */}
-        <TabsContent value="dashboard" className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <Card>
+        <TabsContent value="dashboard">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <Card className="col-span-2">
               <CardHeader>
-                <CardTitle>Transações por Status</CardTitle>
+                <CardTitle>Status de Transações</CardTitle>
               </CardHeader>
-              <CardContent className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={transactionStatusChart}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="count"
-                      nameKey="name"
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    >
-                      {transactionStatusChart.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
+              <CardContent>
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={transactionStatusChart}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="count" name="Quantidade" fill="#8884d8" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </CardContent>
             </Card>
             
             <Card>
+              <CardHeader>
+                <CardTitle>Distribuição por Status</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={transactionStatusChart}
+                        dataKey="count"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        fill="#8884d8"
+                        labelLine={true}
+                        label={({name, percent}) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {transactionStatusChart.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="col-span-2">
               <CardHeader>
                 <CardTitle>Pedidos por Provedor</CardTitle>
               </CardHeader>
-              <CardContent className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={ordersByProviderChart}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="count" fill="#8884d8" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle>Tendência de Duplicações</CardTitle>
-              </CardHeader>
-              <CardContent className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={duplicatesTrendChart}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Line type="monotone" dataKey="count" stroke="#ff8042" />
-                  </LineChart>
-                </ResponsiveContainer>
+              <CardContent>
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={ordersByProviderChart}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="count" name="Quantidade" fill="#82ca9d" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </CardContent>
             </Card>
             
@@ -333,18 +413,20 @@ export default function MonitoringDashboard() {
               <CardHeader>
                 <CardTitle>Performance de Webhooks</CardTitle>
               </CardHeader>
-              <CardContent className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={webhookPerformanceChart}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Line type="monotone" dataKey="time" stroke="#0088FE" />
-                    <Line type="monotone" dataKey="count" stroke="#00C49F" />
-                  </LineChart>
-                </ResponsiveContainer>
+              <CardContent>
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={webhookPerformanceChart}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Line type="monotone" dataKey="time" name="Tempo (ms)" stroke="#8884d8" />
+                      <Line type="monotone" dataKey="count" name="Quantidade" stroke="#82ca9d" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -355,6 +437,26 @@ export default function MonitoringDashboard() {
           <Card>
             <CardHeader>
               <CardTitle>Transações Recentes</CardTitle>
+              <div className="flex flex-col sm:flex-row gap-2 mt-2">
+                <Input
+                  placeholder="Buscar por ID ou Payment ID..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full sm:w-64"
+                />
+                <select
+                  className="p-2 border rounded-md text-sm"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                >
+                  <option value="all">Todos os status</option>
+                  <option value="pending">Pendentes</option>
+                  <option value="approved">Aprovadas</option>
+                  <option value="processing">Em processamento</option>
+                  <option value="cancelled">Canceladas</option>
+                  <option value="error">Com erro</option>
+                </select>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="rounded-md border">
@@ -370,13 +472,8 @@ export default function MonitoringDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {transactions
-                      .filter(tx => 
-                        searchTerm === '' || 
-                        tx.id.includes(searchTerm) || 
-                        (tx.payment_id && tx.payment_id.includes(searchTerm))
-                      )
-                      .slice(0, 10)
+                    {getFilteredTransactions()
+                      .slice(0, 20)
                       .map(tx => (
                         <TableRow key={tx.id}>
                           <TableCell className="font-medium">{tx.id.substring(0, 8)}...</TableCell>
@@ -387,16 +484,22 @@ export default function MonitoringDashboard() {
                                 tx.status === 'approved' ? 'bg-green-500' :
                                 tx.status === 'pending' ? 'bg-yellow-500' :
                                 tx.status === 'error' ? 'bg-red-500' :
+                                tx.status === 'processing' ? 'bg-blue-500' :
+                                tx.status === 'cancelled' ? 'bg-gray-500' :
                                 'bg-gray-500'
                               }
                             >
                               {tx.status}
                             </Badge>
                           </TableCell>
-                          <TableCell>R$ {tx.amount?.toFixed(2) || '0.00'}</TableCell>
+                          <TableCell>R$ {tx.amount ? Number(tx.amount).toFixed(2) : '0.00'}</TableCell>
                           <TableCell>{new Date(tx.created_at).toLocaleString()}</TableCell>
                           <TableCell>
-                            <Button variant="outline" size="sm" onClick={() => alert(`Detalhes da transação ${tx.id}`)}>
+                            <Button 
+                              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+                              size="sm" 
+                              onClick={() => window.open(`/admin/transacoes/${tx.id}`, '_blank')}
+                            >
                               Detalhes
                             </Button>
                           </TableCell>
@@ -405,6 +508,11 @@ export default function MonitoringDashboard() {
                   </TableBody>
                 </Table>
               </div>
+              {getFilteredTransactions().length === 0 && (
+                <div className="text-center py-4 text-gray-500">
+                  Nenhuma transação encontrada com os filtros aplicados
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -423,10 +531,10 @@ export default function MonitoringDashboard() {
                       <TableHead>ID</TableHead>
                       <TableHead>Transação</TableHead>
                       <TableHead>Provedor</TableHead>
-                      <TableHead>Serviço</TableHead>
-                      <TableHead>URL</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Ações</TableHead>
+                      <TableHead>Quantidade</TableHead>
+                      <TableHead>URL Alvo</TableHead>
+                      <TableHead>Data</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -441,30 +549,37 @@ export default function MonitoringDashboard() {
                       .map(order => (
                         <TableRow key={order.id}>
                           <TableCell className="font-medium">{order.id.substring(0, 8)}...</TableCell>
-                          <TableCell>{order.transaction_id?.substring(0, 8)}</TableCell>
-                          <TableCell>{order.provider_id}</TableCell>
-                          <TableCell>{order.service_id}</TableCell>
-                          <TableCell className="max-w-xs truncate">{order.target_url}</TableCell>
+                          <TableCell>{order.transaction_id?.substring(0, 8) || 'N/A'}</TableCell>
+                          <TableCell>{order.provider_id || 'N/A'}</TableCell>
                           <TableCell>
                             <Badge
                               className={
                                 order.status === 'completed' ? 'bg-green-500' :
-                                order.status === 'processing' ? 'bg-blue-500' :
                                 order.status === 'pending' ? 'bg-yellow-500' :
-                                order.status === 'error' ? 'bg-red-500' :
+                                order.status === 'failed' ? 'bg-red-500' :
+                                order.status === 'processing' ? 'bg-blue-500' :
                                 'bg-gray-500'
                               }
                             >
                               {order.status}
                             </Badge>
                           </TableCell>
-                          <TableCell>
-                            <Button variant="outline" size="sm" onClick={() => alert(`Detalhes do pedido ${order.id}`)}>
-                              Detalhes
-                            </Button>
+                          <TableCell>{order.quantity || 'N/A'}</TableCell>
+                          <TableCell className="max-w-xs truncate">
+                            {order.target_url ? (
+                              <a 
+                                href={order.target_url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline"
+                              >
+                                {order.target_url}
+                              </a>
+                            ) : 'N/A'}
                           </TableCell>
+                          <TableCell>{new Date(order.created_at).toLocaleString()}</TableCell>
                         </TableRow>
-                    ))}
+                      ))}
                   </TableBody>
                 </Table>
               </div>
@@ -487,7 +602,7 @@ export default function MonitoringDashboard() {
                       <TableHead>Pedido</TableHead>
                       <TableHead>Provedor</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Erro</TableHead>
+                      <TableHead>Mensagem de Erro</TableHead>
                       <TableHead>Data</TableHead>
                       <TableHead>Ações</TableHead>
                     </TableRow>
@@ -521,7 +636,11 @@ export default function MonitoringDashboard() {
                           <TableCell className="max-w-xs truncate">{integ.error_message}</TableCell>
                           <TableCell>{new Date(integ.created_at).toLocaleString()}</TableCell>
                           <TableCell>
-                            <Button variant="outline" size="sm" onClick={() => alert(`Detalhes da integração ${integ.id}`)}>
+                            <Button 
+                              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+                              size="sm"
+                              onClick={() => alert(`Detalhes da integração ${integ.id}`)}
+                            >
                               Detalhes
                             </Button>
                           </TableCell>
@@ -530,6 +649,11 @@ export default function MonitoringDashboard() {
                   </TableBody>
                 </Table>
               </div>
+              {integrations.length === 0 && (
+                <div className="text-center py-4 text-gray-500">
+                  Nenhuma integração encontrada
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -538,7 +662,7 @@ export default function MonitoringDashboard() {
         <TabsContent value="duplicates">
           <Card>
             <CardHeader>
-              <CardTitle>Possíveis Duplicações Detectadas</CardTitle>
+              <CardTitle>Potenciais Duplicações</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="rounded-md border">
@@ -546,52 +670,47 @@ export default function MonitoringDashboard() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Hash</TableHead>
+                      <TableHead>Último Pedido</TableHead>
                       <TableHead>Transação</TableHead>
-                      <TableHead>URL</TableHead>
-                      <TableHead>Serviço</TableHead>
                       <TableHead>Provedor</TableHead>
-                      <TableHead>Contagem</TableHead>
-                      <TableHead>Primeira vez</TableHead>
-                      <TableHead>Última vez</TableHead>
-                      <TableHead>Ações</TableHead>
+                      <TableHead>URL Alvo</TableHead>
+                      <TableHead>Ocorrências</TableHead>
+                      <TableHead>Detectado</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {duplicates
                       .filter(dup => 
                         searchTerm === '' || 
-                        dup.hash_key.includes(searchTerm) ||
-                        dup.transaction_id.includes(searchTerm) ||
-                        (dup.target_url && dup.target_url.includes(searchTerm))
+                        dup.hash_key.includes(searchTerm) || 
+                        (dup.order_id && dup.order_id.includes(searchTerm)) ||
+                        (dup.transaction_id && dup.transaction_id.includes(searchTerm))
                       )
                       .slice(0, 10)
                       .map(dup => (
                         <TableRow key={dup.id}>
                           <TableCell className="font-medium">{dup.hash_key.substring(0, 8)}...</TableCell>
-                          <TableCell>{dup.transaction_id.substring(0, 8)}</TableCell>
-                          <TableCell className="max-w-xs truncate">{dup.target_url}</TableCell>
-                          <TableCell>{dup.service_id}</TableCell>
-                          <TableCell>{dup.provider_id}</TableCell>
+                          <TableCell>{dup.order_id?.substring(0, 8) || 'N/A'}</TableCell>
+                          <TableCell>{dup.transaction_id?.substring(0, 8) || 'N/A'}</TableCell>
+                          <TableCell>{dup.provider_id || 'N/A'}</TableCell>
+                          <TableCell className="max-w-xs truncate">
+                            {dup.target_url ? (
+                              <a 
+                                href={dup.target_url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline"
+                              >
+                                {dup.target_url}
+                              </a>
+                            ) : 'N/A'}
+                          </TableCell>
                           <TableCell>
-                            <Badge 
-                              className={
-                                dup.count > 3 ? 'bg-red-500' :
-                                dup.count > 1 ? 'bg-yellow-500' :
-                                'bg-green-500'
-                              }
-                            >
-                              {dup.count}
-                            </Badge>
+                            <Badge variant="outline">{dup.count}</Badge>
                           </TableCell>
                           <TableCell>{new Date(dup.first_seen).toLocaleString()}</TableCell>
-                          <TableCell>{new Date(dup.last_seen).toLocaleString()}</TableCell>
-                          <TableCell>
-                            <Button variant="outline" size="sm" onClick={() => alert(`Análise de duplicação ${dup.hash_key}`)}>
-                              Analisar
-                            </Button>
-                          </TableCell>
                         </TableRow>
-                    ))}
+                      ))}
                   </TableBody>
                 </Table>
               </div>
