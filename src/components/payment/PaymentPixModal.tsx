@@ -1,9 +1,6 @@
 'use client';
 
-import { Dialog, Transition } from '@headlessui/react';
-import { Fragment, useEffect, useState, useCallback } from 'react';
-import { PaymentSuccessModal } from './PaymentSuccessModal';
-import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 interface PaymentPixModalProps {
   isOpen: boolean;
@@ -13,71 +10,13 @@ interface PaymentPixModalProps {
     username: string;
   };
   amount: number;
-  onPaymentConfirmed?: (paymentId: string) => void;
   customerEmail?: string;
   customerName?: string;
   serviceName?: string;
   returnUrl?: string;
 }
 
-interface PaymentData {
-  amount: number;
-  service_id: string;
-  profile_username: string;
-  customer_email: string;
-  customer_name: string;
-  service_name: string;
-  return_url: string;
-}
-
-// Componente para mostrar o timer de expiração
-function ExpireTimer({ expiresAt }: { expiresAt: Date }) {
-  const [timeLeft, setTimeLeft] = useState<{ minutes: number; seconds: number }>({ minutes: 0, seconds: 0 });
-  const [expired, setExpired] = useState(false);
-
-  useEffect(() => {
-    const calculateTimeLeft = () => {
-      const now = new Date();
-      const difference = expiresAt.getTime() - now.getTime();
-      
-      if (difference <= 0) {
-        setExpired(true);
-        setTimeLeft({ minutes: 0, seconds: 0 });
-        return;
-      }
-      
-      const minutes = Math.floor((difference / 1000 / 60) % 60);
-      const seconds = Math.floor((difference / 1000) % 60);
-      
-      setTimeLeft({ minutes, seconds });
-    };
-    
-    calculateTimeLeft();
-    const timer = setInterval(calculateTimeLeft, 1000);
-    
-    return () => clearInterval(timer);
-  }, [expiresAt]);
-  
-  if (expired) {
-    return (
-      <div className="text-red-600 font-medium text-center my-2">
-        O código PIX expirou! Por favor, gere um novo.
-      </div>
-    );
-  }
-  
-  return (
-    <div className="text-center my-2">
-      <p className="text-sm text-gray-600 mb-1">Tempo para pagamento:</p>
-      <p className="text-lg font-semibold">
-        {timeLeft.minutes.toString().padStart(2, '0')}:{timeLeft.seconds.toString().padStart(2, '0')}
-      </p>
-      <p className="text-xs text-gray-500">O código PIX expira em 30 minutos</p>
-    </div>
-  );
-}
-
-// Simplifying the component - removing all UI rendering and focusing only on redirection
+// Simplificando o componente ao máximo para evitar problemas de renderização
 export default function PaymentPixModal({
   isOpen,
   onClose,
@@ -89,63 +28,107 @@ export default function PaymentPixModal({
   serviceName = '',
   returnUrl = 'https://viralizamos.com/agradecimento'
 }: PaymentPixModalProps) {
-  // Use a single ref to track if we've redirected
-  const [hasRedirected, setHasRedirected] = useState(false);
-  
-  // Separate side effect from component rendering cycle
-  useEffect(() => {
-    // Only attempt redirection if we haven't already and the modal is open
-    if (isOpen && !hasRedirected && typeof window !== 'undefined') {
-      try {
-        // Mark as redirected immediately to prevent multiple redirects
-        setHasRedirected(true);
-        
-        // Create payment data object
-        const paymentData = {
-          amount,
-          service_id: serviceId,
-          profile_username: profileData?.username || '',
-          customer_email: customerEmail || 'cliente@exemplo.com',
-          customer_name: customerName || 'Cliente',
-          service_name: serviceName || 'Serviço Viralizamos',
-          return_url: returnUrl
-        };
-        
-        // Encode as base64 using browser's native API
-        const jsonString = JSON.stringify(paymentData);
-        const base64Data = btoa(encodeURIComponent(jsonString));
-        
-        // Build payment URL
-        const paymentServiceUrl = process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || 'https://pagamentos.viralizamos.com';
-        const paymentUrl = `${paymentServiceUrl}/pagamento/pix#${base64Data}`;
-        
-        // Redirect to payment service in the browser
-        window.location.href = paymentUrl;
-      } catch (error) {
-        console.error('Erro ao redirecionar para serviço de pagamento:', error);
-        // If redirect fails, reset flag and close modal if possible
-        setHasRedirected(false);
-        if (onClose) onClose();
+  // Log de diagnóstico detalhado
+  console.log('[PaymentPixModal] Render', { 
+    isOpen, 
+    serviceId, 
+    profileUsername: profileData?.username || 'undefined', 
+    amount 
+  });
+
+  // Função para gerar URL de pagamento
+  function generatePaymentUrl() {
+    try {
+      console.log('[PaymentPixModal] Gerando URL de pagamento');
+      
+      if (!serviceId) {
+        console.error('[PaymentPixModal] ERRO: serviceId não definido');
+        return null;
       }
+      
+      if (!profileData || !profileData.username) {
+        console.error('[PaymentPixModal] ERRO: profileData.username não definido', profileData);
+        return null;
+      }
+      
+      if (!amount) {
+        console.error('[PaymentPixModal] ERRO: amount não definido');
+        return null;
+      }
+      
+      // Criar objeto com dados do pagamento
+      const paymentData = {
+        amount,
+        service_id: serviceId,
+        profile_username: profileData.username,
+        customer_email: customerEmail || 'cliente@exemplo.com',
+        customer_name: customerName || 'Cliente',
+        service_name: serviceName || 'Serviço Viralizamos',
+        return_url: returnUrl
+      };
+      
+      console.log('[PaymentPixModal] Dados de pagamento:', paymentData);
+      
+      // Codificar dados em base64
+      const jsonString = JSON.stringify(paymentData);
+      const base64Data = btoa(encodeURIComponent(jsonString));
+      
+      // Construir URL
+      const paymentServiceUrl = process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || 'https://pagamentos.viralizamos.com';
+      const paymentUrl = `${paymentServiceUrl}/pagamento/pix#${base64Data}`;
+      
+      console.log('[PaymentPixModal] URL gerada:', paymentUrl);
+      return paymentUrl;
+    } catch (error) {
+      console.error('[PaymentPixModal] Erro ao gerar URL:', error);
+      return null;
+    }
+  }
+
+  // Efeito simplificado para redirecionamento
+  useEffect(() => {
+    if (!isOpen) {
+      console.log('[PaymentPixModal] Modal não está aberto, ignorando');
+      return;
     }
     
-    // When modal closes, reset the redirect flag for next time
-    if (!isOpen && hasRedirected) {
-      setHasRedirected(false);
-    }
-  }, [
-    isOpen, 
-    hasRedirected, 
-    serviceId, 
-    profileData, 
-    amount, 
-    customerEmail, 
-    customerName, 
-    serviceName, 
-    returnUrl, 
-    onClose
-  ]);
+    console.log('[PaymentPixModal] Modal aberto, iniciando redirecionamento');
+    
+    // Usar um timer para garantir que estamos fora do ciclo de renderização
+    const redirectTimer = setTimeout(() => {
+      try {
+        console.log('[PaymentPixModal] Executando redirecionamento após timeout');
+        const url = generatePaymentUrl();
+        
+        if (!url) {
+          console.error('[PaymentPixModal] Falha ao gerar URL de pagamento');
+          if (onClose) {
+            console.log('[PaymentPixModal] Fechando modal devido a erro');
+            onClose();
+          }
+          return;
+        }
+        
+        // Registrar que vamos redirecionar
+        console.log('[PaymentPixModal] Redirecionando para:', url);
+        
+        // Redirecionar usando o método mais direto
+        if (typeof window !== 'undefined') {
+          window.location.href = url;
+        }
+      } catch (error) {
+        console.error('[PaymentPixModal] Erro durante redirecionamento:', error);
+        if (onClose) onClose();
+      }
+    }, 100); // Pequeno atraso para garantir que saímos do ciclo de renderização
+    
+    // Limpeza
+    return () => {
+      console.log('[PaymentPixModal] Limpando timer de redirecionamento');
+      clearTimeout(redirectTimer);
+    };
+  }, [isOpen]); // Apenas depender de isOpen para evitar loops infinitos
   
-  // Don't render anything - this component only handles redirection
+  // Não renderizar nada
   return null;
 }
