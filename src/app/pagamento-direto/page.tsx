@@ -140,6 +140,16 @@ function PagamentoDiretoContent() {
         
         console.log("Redirecionando para:", redirectUrl);
         
+        // Verificar se a URL não está muito longa (pode causar problemas)
+        if (redirectUrl.length > 2000) {
+          console.warn("AVISO: URL muito longa pode causar problemas:", redirectUrl.length);
+          document.getElementById('error-message').textContent = 
+            "A URL de redirecionamento é muito longa. Por favor, selecione menos posts ou contate o suporte.";
+          document.getElementById('error-container').style.display = 'block';
+          document.getElementById('loading-container').style.display = 'none';
+          return;
+        }
+        
         // Redirecionar automaticamente
         window.location.href = redirectUrl;
       } catch (error) {
