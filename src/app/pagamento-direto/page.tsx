@@ -12,8 +12,15 @@ import { useSearchParams } from 'next/navigation';
  */
 export default function PagamentoDireto() {
   const searchParams = useSearchParams();
+  
+  // Definir a URL do serviço de pagamento para uso no script
+  const paymentServiceUrl = process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || 'https://pagamentos.viralizamos.com';
 
   useEffect(() => {
+    // Adicionar a URL do serviço de pagamento como variável global
+    // para evitar problemas de interpolação no script
+    window.__PAYMENT_SERVICE_URL = paymentServiceUrl;
+    
     // Script de redirecionamento executado uma única vez após a montagem do componente
     const script = document.createElement('script');
     script.innerHTML = `
@@ -84,8 +91,8 @@ export default function PagamentoDireto() {
         // Codificar em base64
         const base64Data = btoa(encodeURIComponent(jsonData));
         
-        // URL do microserviço
-        const microserviceUrl = '${process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || "https://pagamentos.viralizamos.com"}';
+        // URL do microserviço - usar a variável global definida pelo React
+        const microserviceUrl = window.__PAYMENT_SERVICE_URL;
         
         // URL final para redirecionamento
         const redirectUrl = microserviceUrl + '/pagamento/pix#' + base64Data;
@@ -108,8 +115,10 @@ export default function PagamentoDireto() {
     // Cleanup
     return () => {
       document.body.removeChild(script);
+      // Limpar a variável global de forma segura
+      window.__PAYMENT_SERVICE_URL = undefined;
     };
-  }, []);
+  }, [paymentServiceUrl]);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-4">
@@ -141,4 +150,11 @@ export default function PagamentoDireto() {
       </div>
     </div>
   );
+}
+
+// Adicionar a declaração de tipos para a propriedade global
+declare global {
+  interface Window {
+    __PAYMENT_SERVICE_URL: string;
+  }
 } 
