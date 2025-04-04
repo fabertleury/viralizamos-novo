@@ -1,15 +1,8 @@
 'use client';
 
-// Importamos apenas o necessário
-import { useRef, useLayoutEffect } from 'react';
-
-interface PaymentPixModalProps {
-  isOpen: boolean;
-  onClose?: () => void;
+interface PaymentData {
   serviceId: string;
-  profileData: {
-    username: string;
-  };
+  profileUsername: string;
   amount: number;
   customerEmail?: string;
   customerName?: string;
@@ -18,56 +11,32 @@ interface PaymentPixModalProps {
 }
 
 /**
- * IMPORTANTE: Este componente não é mais um modal.
- * Ele é apenas um redirecionador para a página de pagamento do microserviço,
- * mas mantém a mesma interface para não quebrar o código existente.
+ * Objeto com métodos puros para processamento de pagamento
+ * Não é um componente React, apenas um utilitário JavaScript
  */
-export default function PaymentPixModal(props: PaymentPixModalProps) {
-  // Função que executa o redirecionamento diretamente
-  function redirecionarParaPagamento() {
+const PaymentService = {
+  /**
+   * Redireciona o usuário para a página de pagamento PIX
+   */
+  redirecionarParaPagamentoPixNoMicroservico: (dados: PaymentData): boolean => {
     try {
-      // Extrair dados das props
-      const { 
-        serviceId, 
-        profileData, 
-        amount, 
-        customerEmail = '', 
-        customerName = '', 
-        serviceName = '', 
-        returnUrl = 'https://viralizamos.com/agradecimento' 
-      } = props;
+      console.log('Iniciando redirecionamento para pagamento PIX:', dados);
       
-      console.log('Preparando redirecionamento para pagamento:', { 
-        serviceId, 
-        username: profileData?.username, 
-        amount 
-      });
-      
-      // Verificar dados obrigatórios
-      if (!serviceId) {
-        console.error('Redirecionamento falhou: serviceId não fornecido');
+      // Validar dados mínimos
+      if (!dados.serviceId || !dados.profileUsername || !dados.amount) {
+        console.error('Dados insuficientes para pagamento:', dados);
         return false;
       }
       
-      if (!profileData?.username) {
-        console.error('Redirecionamento falhou: username não fornecido');
-        return false;
-      }
-      
-      if (!amount) {
-        console.error('Redirecionamento falhou: amount não fornecido');
-        return false;
-      }
-      
-      // Preparar dados para codificação
+      // Criar dados de pagamento
       const paymentData = {
-        amount,
-        service_id: serviceId,
-        profile_username: profileData.username,
-        customer_email: customerEmail || 'cliente@exemplo.com',
-        customer_name: customerName || 'Cliente',
-        service_name: serviceName || 'Serviço Viralizamos',
-        return_url: returnUrl
+        amount: dados.amount,
+        service_id: dados.serviceId,
+        profile_username: dados.profileUsername,
+        customer_email: dados.customerEmail || 'cliente@exemplo.com',
+        customer_name: dados.customerName || 'Cliente',
+        service_name: dados.serviceName || 'Serviço Viralizamos',
+        return_url: dados.returnUrl || 'https://viralizamos.com/agradecimento'
       };
       
       // Codificar em base64
@@ -76,36 +45,69 @@ export default function PaymentPixModal(props: PaymentPixModalProps) {
         const jsonString = JSON.stringify(paymentData);
         base64Data = btoa(encodeURIComponent(jsonString));
       } catch (e) {
-        console.error('Erro ao codificar dados:', e);
+        console.error('Erro ao codificar dados para pagamento:', e);
         return false;
       }
       
-      // Construir URL final
+      // Gerar URL final para microserviço
       const paymentServiceUrl = process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || 'https://pagamentos.viralizamos.com';
       const url = `${paymentServiceUrl}/pagamento/pix#${base64Data}`;
       
-      // Iniciar redirecionamento
-      console.log('Redirecionando para:', url);
+      // Executar redirecionamento direto
+      console.log('Redirecionando para URL de pagamento:', url);
       window.location.href = url;
-      
       return true;
     } catch (error) {
-      console.error('Erro durante redirecionamento:', error);
+      console.error('Erro fatal durante redirecionamento:', error);
       return false;
     }
   }
-  
-  // Se o modal estiver "aberto", executamos o redirecionamento
-  if (props.isOpen && typeof window !== 'undefined') {
-    // Executar redirecionamento imediatamente
-    const resultado = redirecionarParaPagamento();
-    
-    // Se falhar e houver callback de fechamento, chamá-lo
-    if (!resultado && props.onClose) {
-      props.onClose();
-    }
+};
+
+/**
+ * Apenas para manter compatibilidade com a API atual
+ * Este componente não renderiza nada, apenas executa o redirecionamento
+ */
+export default function PaymentPixModal({ 
+  isOpen, 
+  onClose, 
+  serviceId, 
+  profileData, 
+  amount, 
+  customerEmail, 
+  customerName, 
+  serviceName, 
+  returnUrl 
+}: any) {
+  // Se estiver "aberto", redirecionar imediatamente
+  if (isOpen && typeof window !== 'undefined') {
+    // Use setTimeout para executar o redirecionamento fora do ciclo do React
+    setTimeout(() => {
+      try {
+        const resultado = PaymentService.redirecionarParaPagamentoPixNoMicroservico({
+          serviceId,
+          profileUsername: profileData?.username || '',
+          amount,
+          customerEmail,
+          customerName,
+          serviceName,
+          returnUrl
+        });
+        
+        // Se falhar e tiver callback de fechamento, chamá-lo
+        if (!resultado && onClose) {
+          onClose();
+        }
+      } catch (e) {
+        console.error('Erro no redirecionamento:', e);
+        if (onClose) onClose();
+      }
+    }, 0);
   }
   
-  // Este componente não renderiza nada visualmente
+  // Não renderizar nada
   return null;
 }
+
+// Exportar o serviço diretamente para uso independente
+export { PaymentService };
