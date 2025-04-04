@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, BookCheck, Film, Image } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getProxiedImageUrl } from '../../utils/proxy-image';
-import PaymentPixModal, { PaymentService } from '@/components/payment/PaymentPixModal';
+import PaymentButton from '@/components/payment/PaymentButton';
 import { CouponInput } from '@/components/checkout/CouponInput';
 import axios from 'axios';
 import { useInstagramAPI } from '@/hooks/useInstagramAPI';
@@ -734,109 +734,9 @@ export default function Step2Page() {
       toast.error('Selecione pelo menos um post ou reel');
       return;
     }
-
-    setLoading(true);
-
-    try {
-      // Log detalhado dos posts e reels selecionados
-      console.log('📊 Posts selecionados para pagamento:', selectedPosts.map(post => ({
-        id: post.id,
-        code: post.code,
-        shortcode: post.shortcode,
-        url: `https://instagram.com/p/${post.code}`
-      })));
-      
-      console.log('📊 Reels selecionados para pagamento:', selectedReels.map(reel => ({
-        id: reel.id,
-        code: reel.code,
-        shortcode: reel.shortcode,
-        url: `https://instagram.com/reel/${reel.code}`
-      })));
-
-      // Preparar os dados para o pagamento
-      const postIds = selectedPosts.map(post => post.id);
-      const reelIds = selectedReels.map(reel => reel.id);
-      const postCodes = selectedPosts.map(post => extractPostCode(post));
-      const reelCodes = selectedReels.map(reel => extractPostCode(reel));
-
-      // Estruturar os dados conforme esperado pela API
-      const paymentData = {
-        service: {
-          id: service.id,
-          name: service.name,
-          price: finalAmount || service.preco,
-          preco: finalAmount || service.preco,
-          quantity: service.quantidade,
-          quantidade: service.quantidade,
-          provider_id: service.provider_id
-        },
-        profile: profileData,
-        customer: {
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone
-        },
-        posts: [...selectedPosts, ...selectedReels],
-        amount: finalAmount || service.preco
-      };
-
-      console.log('Enviando dados para API de pagamento:', paymentData);
-
-      // Criar pagamento via Pix
-      const response = await fetch('/api/core/payment/pix', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(paymentData),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Erro ao criar pagamento');
-      }
-
-      const paymentResponse = await response.json();
-      
-      console.log('Dados completos do pagamento:', {
-        paymentId: paymentResponse.id,
-        paymentIdType: typeof paymentResponse.id,
-        paymentIdLength: paymentResponse.id?.length,
-        paymentData: JSON.stringify(paymentResponse, null, 2)
-      });
-
-      // Garantir que temos todos os dados necessários
-      if (!paymentResponse.id || !paymentResponse.qr_code) {
-        throw new Error('Dados de pagamento incompletos');
-      }
-
-      // Armazenar os dados para enviar ao admin depois do redirecionamento
-      setPaymentData({
-        qrCodeText: paymentResponse.qr_code,
-        paymentId: paymentResponse.id,
-        amount: service.preco,
-        qrCodeBase64: paymentResponse.qr_code_base64
-      });
-      
-      // Permitir o envio da transação para o admin
-      await sendTransactionToAdmin();
-
-      // Redirecionar diretamente via PaymentService
-      await directRedirectToPaymentService({
-        serviceId: service.id,
-        profileUsername: profileData.username,
-        amount: finalAmount || service.preco,
-        customerEmail: formData.email,
-        customerName: formData.name,
-        serviceName: service.name,
-        returnUrl: "/agradecimento"
-      });
-    } catch (error) {
-      console.error('Error creating payment:', error);
-      toast.error('Erro ao criar pagamento. Por favor, tente novamente.');
-    } finally {
-      setLoading(false);
-    }
+    // Este código não é mais necessário, pois está no callback onBeforeRedirect do PaymentButton
+    // Mantido apenas para compatibilidade/histórico
+    toast.info('Use o botão "PAGAR COM PIX" para iniciar o pagamento');
   };
 
   const handleClosePaymentModal = () => {
@@ -1123,28 +1023,117 @@ export default function Step2Page() {
 
                     {/* Botão de pagamento PIX */}
                     <div className="flex items-center justify-center my-4">
-                      <button 
-                        onClick={() => handleSubmit()}
+                      <PaymentButton 
+                        data={{
+                          serviceId: service?.id || '',
+                          profileUsername: profileData?.username || '',
+                          amount: finalAmount || service?.preco || 0,
+                          customerEmail: formData.email,
+                          customerName: formData.name,
+                          serviceName: service?.name,
+                          returnUrl: "/agradecimento"
+                        }}
                         disabled={loading || selectedItemsCount === 0 || !formData.name || !formData.email || !formData.phone}
-                        className={`
-                          px-6 py-3 rounded-full font-bold text-sm uppercase tracking-wider 
-                          transition-all duration-300 ease-in-out transform w-full
-                          ${loading || selectedItemsCount === 0 || !formData.name || !formData.email || !formData.phone
-                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                            : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:scale-105 hover:shadow-lg'}
-                        `}
-                      >
-                        {loading ? (
-                          <span className="flex items-center justify-center">
-                            <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                            Processando...
-                          </span>
-                        ) : (
-                          <span className="flex items-center justify-center">
-                            PAGAR COM PIX
-                          </span>
-                        )}
-                      </button>
+                        onBeforeRedirect={async () => {
+                          try {
+                            // Etapa 1: Criar pagamento na API
+                            setLoading(true);
+                            
+                            // Log detalhado dos posts e reels selecionados
+                            console.log('📊 Posts selecionados para pagamento:', selectedPosts.map(post => ({
+                              id: post.id,
+                              code: post.code,
+                              shortcode: post.shortcode,
+                              url: `https://instagram.com/p/${post.code}`
+                            })));
+                            
+                            console.log('📊 Reels selecionados para pagamento:', selectedReels.map(reel => ({
+                              id: reel.id,
+                              code: reel.code,
+                              shortcode: reel.shortcode,
+                              url: `https://instagram.com/reel/${reel.code}`
+                            })));
+
+                            // Estruturar os dados conforme esperado pela API
+                            const paymentApiData = {
+                              service: {
+                                id: service.id,
+                                name: service.name,
+                                price: finalAmount || service.preco,
+                                preco: finalAmount || service.preco,
+                                quantity: service.quantidade,
+                                quantidade: service.quantidade,
+                                provider_id: service.provider_id
+                              },
+                              profile: profileData,
+                              customer: {
+                                name: formData.name,
+                                email: formData.email,
+                                phone: formData.phone
+                              },
+                              posts: [...selectedPosts, ...selectedReels],
+                              amount: finalAmount || service.preco
+                            };
+
+                            console.log('Enviando dados para API de pagamento:', paymentApiData);
+
+                            // Criar pagamento via Pix
+                            const response = await fetch('/api/core/payment/pix', {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                              },
+                              body: JSON.stringify(paymentApiData),
+                            });
+
+                            if (!response.ok) {
+                              const error = await response.json();
+                              throw new Error(error.message || 'Erro ao criar pagamento');
+                            }
+
+                            const paymentResponse = await response.json();
+                            
+                            console.log('Dados completos do pagamento:', {
+                              paymentId: paymentResponse.id,
+                              paymentIdType: typeof paymentResponse.id,
+                              paymentIdLength: paymentResponse.id?.length,
+                              paymentData: JSON.stringify(paymentResponse, null, 2)
+                            });
+
+                            // Garantir que temos todos os dados necessários
+                            if (!paymentResponse.id || !paymentResponse.qr_code) {
+                              throw new Error('Dados de pagamento incompletos');
+                            }
+
+                            // Armazenar os dados para enviar ao admin
+                            setPaymentData({
+                              qrCodeText: paymentResponse.qr_code,
+                              paymentId: paymentResponse.id,
+                              amount: service.preco,
+                              qrCodeBase64: paymentResponse.qr_code_base64
+                            });
+                            
+                            // Etapa 2: Registrar transação no admin
+                            await sendTransactionToAdmin();
+                            
+                            // Se chegou até aqui, pode redirecionar
+                            return true;
+                          } catch (error) {
+                            console.error('Erro ao preparar pagamento:', error);
+                            toast.error('Erro ao criar pagamento. Por favor, tente novamente.');
+                            setLoading(false);
+                            return false;
+                          }
+                        }}
+                        onRedirectSuccess={() => {
+                          console.log('Redirecionamento iniciado com sucesso');
+                        }}
+                        onRedirectError={(error) => {
+                          console.error('Erro no redirecionamento:', error);
+                          toast.error('Erro ao redirecionar para pagamento. Por favor, tente novamente.');
+                          setLoading(false);
+                        }}
+                      />
                     </div>
 
                     <CouponInput 
@@ -1165,31 +1154,4 @@ export default function Step2Page() {
       </main>
     </div>
   );
-}
-
-async function directRedirectToPaymentService(data: {
-  serviceId: string,
-  profileUsername: string,
-  amount: number,
-  customerEmail?: string,
-  customerName?: string,
-  serviceName?: string,
-  returnUrl?: string
-}) {
-  console.log('Redirecionando para serviço de pagamento:', data);
-  
-  // Usar setTimeout para garantir que o redirecionamento ocorra após a renderização do React
-  setTimeout(() => {
-    try {
-      // Redirecionar usando o PaymentService
-      const sucesso = PaymentService.redirecionarParaPagamentoPixNoMicroservico(data);
-      
-      if (!sucesso) {
-        console.error('Falha no redirecionamento para pagamento');
-        // Poderia mostrar um toast aqui, mas não funciona após redirecionamento
-      }
-    } catch (error) {
-      console.error('Erro ao redirecionar para pagamento:', error);
-    }
-  }, 100);
 }
