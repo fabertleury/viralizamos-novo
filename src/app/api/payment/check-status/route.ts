@@ -1,14 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server';
-import mercadopago from 'mercadopago';
-import { createClient } from '@/lib/supabase/server';
-import { BackgroundPaymentChecker } from '@/lib/services/backgroundPaymentChecker';
+/**
+ * MICROSERVIÇO: Esta funcionalidade foi movida para o microserviço de pagamentos
+ * 
+ * Esta API agora redireciona para o endpoint equivalente no microserviço de pagamentos.
+ */
 
-// Configuração do Mercado Pago
-mercadopago.configurations.setAccessToken(process.env.MERCADO_PAGO_ACCESS_TOKEN || '');
+import { NextRequest, NextResponse } from 'next/server';
+
+const PAYMENT_SERVICE_URL = process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || 'https://pagamentos.viralizamos.com';
 
 export async function POST(request: NextRequest) {
   try {
-    const { payment_id } = await request.json();
+    const body = await request.json();
+    const { payment_id } = body;
 
     if (!payment_id) {
       return NextResponse.json({
@@ -17,19 +20,33 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const checker = BackgroundPaymentChecker.getInstance();
-    const status = await checker.checkPaymentStatus(payment_id);
-
-    return NextResponse.json({
-      status,
-      payment_id
+    console.log(`Redirecionando verificação do pagamento para microserviço: ${payment_id}`);
+    
+    // Construir URL para o endpoint no microserviço
+    const redirectUrl = `${PAYMENT_SERVICE_URL}/api/payments/status`;
+    
+    // Enviar solicitação para o microserviço
+    const response = await fetch(redirectUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ payment_id }),
     });
+    
+    if (!response.ok) {
+      throw new Error(`Microserviço retornou código ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return NextResponse.json(data);
   } catch (error) {
     console.error('Erro ao verificar status do pagamento:', error);
     return NextResponse.json({
-      error: 'Failed to check payment status',
+      message: 'Esta funcionalidade foi migrada para o microserviço de pagamentos',
+      error: 'Communication error with payment service',
       details: String(error)
-    }, { status: 500 });
+    }, { status: 502 });
   }
 }
 

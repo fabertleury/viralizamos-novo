@@ -1,51 +1,20 @@
-import { NextResponse } from 'next/server';
-import { BackgroundPaymentChecker } from '@/lib/services/backgroundPaymentChecker';
-import { createClient } from '@/lib/supabase/server';
-
 /**
- * API para verificar transações que estão próximas de expirar
- * Esta API pode ser chamada por um cron job para verificar periodicamente
- * transações que estão prestes a expirar (30 minutos após o QR code expirar)
+ * MICROSERVIÇO: Esta funcionalidade foi movida para o microserviço de pagamentos
+ * 
+ * Esta API é mantida para compatibilidade, mas não executa mais a verificação
+ * de pagamentos prestes a expirar, que agora é responsabilidade do microserviço.
  */
+
+import { NextResponse } from 'next/server';
+
 export async function GET() {
-  try {
-    // Iniciar o verificador de pagamentos
-    const backgroundChecker = BackgroundPaymentChecker.getInstance();
-    
-    // Registrar no log a verificação
-    const supabase = createClient();
-    await supabase.from('transaction_logs').insert({
-      event_type: 'check_expiring_request',
-      message: 'Verificação de transações prestes a expirar iniciada',
-      metadata: { source: 'api', timestamp: new Date().toISOString() }
-    });
+  console.log('AVISO: API de verificação de transações prestes a expirar foi migrada para o microserviço de pagamentos');
+  
+  return NextResponse.json({
+    success: true,
+    message: 'Esta funcionalidade foi migrada para o microserviço de pagamentos'
+  });
+}
 
-    // Executar a verificação de transações prestes a expirar
-    await backgroundChecker.verifyExpiringTransactions();
-    
-    // Registrar no log o resultado da verificação
-    await supabase.from('transaction_logs').insert({
-      event_type: 'check_expiring_completed',
-      message: 'Verificação de transações prestes a expirar concluída',
-      metadata: { source: 'api', timestamp: new Date().toISOString() }
-    });
-
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Verificação de transações prestes a expirar iniciada' 
-    });
-  } catch (error: Error | unknown) {
-    console.error('Erro ao iniciar verificação de transações prestes a expirar:', error);
-    
-    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-    
-    return NextResponse.json(
-      { 
-        success: false, 
-        message: 'Erro ao iniciar verificação de transações', 
-        error: errorMessage 
-      },
-      { status: 500 }
-    );
-  }
-} 
+// Configurar como rota dinâmica para executar a cada requisição
+export const dynamic = 'force-dynamic'; 

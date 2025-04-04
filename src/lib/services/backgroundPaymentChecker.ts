@@ -1,224 +1,71 @@
 /**
- * Exporta o novo sistema de pagamento refatorado
+ * MICROSERVIÇO: Esta funcionalidade foi movida para o microserviço de pagamentos
  * 
- * Este arquivo serve como uma camada de compatibilidade para a migração
- * do BackgroundPaymentChecker para o novo sistema modular.
- * 
- * NOTA: A maioria das funcionalidades foi migrada para microserviços dedicados.
- * Este wrapper permanece para compatibilidade com código legado.
+ * Este arquivo é mantido apenas como um stub para manter compatibilidade com
+ * código legado, mas todas as funcionalidades de verificação e processamento
+ * de pagamentos foram transferidas para o microserviço dedicado.
  */
 
-import { PaymentChecker } from './payment/PaymentChecker';
-import type { TransactionType, PaymentStatusResult, TransactionProcessResult, PendingPaymentsCheckResult } from './payment/types';
-import { createClient } from '@/lib/supabase/server';
-import { TransactionProcessor } from './payment/TransactionProcessor';
-import { OrderProcessor } from './order/OrderProcessor';
+import type { TransactionType } from './payment/types';
 
 /**
- * Wrapper para manter compatibilidade com a API anterior
+ * Stub para manter compatibilidade com a API anterior
+ * Todas as funcionalidades foram migradas para o microserviço de pagamentos
  */
 export class BackgroundPaymentChecker {
   private static instance: BackgroundPaymentChecker;
-  private paymentChecker: PaymentChecker;
 
   private constructor() {
-    this.paymentChecker = PaymentChecker.getInstance();
+    console.log('AVISO: BackgroundPaymentChecker está obsoleto - use o microserviço de pagamentos');
   }
 
   public static getInstance(): BackgroundPaymentChecker {
     if (!BackgroundPaymentChecker.instance) {
-      // Log removido - funcionalidade migrada para microserviço
+      console.log('AVISO: A verificação de pagamentos foi migrada para o microserviço');
       BackgroundPaymentChecker.instance = new BackgroundPaymentChecker();
     }
     return BackgroundPaymentChecker.instance;
   }
 
-  public async startChecking(forceCheck = false) {
-    return this.paymentChecker.startChecking(forceCheck);
+  public async startChecking() {
+    console.log('AVISO: startChecking não executa mais - use o microserviço de pagamentos');
+    return { status: 'success', checked: false, message: 'Função migrada para microserviço' };
   }
 
   public stopChecking() {
-    this.paymentChecker.stopChecking();
+    console.log('AVISO: stopChecking não executa mais - use o microserviço de pagamentos');
   }
 
-  public async checkPendingPayments(): Promise<PendingPaymentsCheckResult> {
-    // Método privado no novo PaymentChecker, mas exposto publicamente aqui
-    // para compatibilidade com o código anterior
-    return (this.paymentChecker as unknown as { 
-      checkPendingPayments: () => Promise<PendingPaymentsCheckResult> 
-    }).checkPendingPayments();
+  public async checkPendingPayments() {
+    console.log('AVISO: checkPendingPayments não executa mais - use o microserviço de pagamentos');
+    return { status: 'success', processed: 0, message: 'Função migrada para microserviço' };
   }
 
   public async verifyExpiringTransactions() {
-    return this.paymentChecker.verifyExpiringTransactions();
+    console.log('AVISO: verifyExpiringTransactions não executa mais - use o microserviço de pagamentos');
+    return { status: 'success', verified: 0, message: 'Função migrada para microserviço' };
   }
 
-  public async checkPaymentStatus(paymentId: string): Promise<PaymentStatusResult> {
-    return this.paymentChecker.checkPaymentStatus(paymentId);
+  public async checkPaymentStatus(paymentId: string) {
+    console.log(`AVISO: checkPaymentStatus para ${paymentId} não executa mais - use o microserviço de pagamentos`);
+    return { status: 'unknown', transaction_id: '', message: 'Função migrada para microserviço' };
   }
 
-  public async checkPayment(transaction: TransactionType): Promise<TransactionProcessResult | undefined> {
-    return this.paymentChecker.processTransaction(transaction);
+  public async checkPayment(transaction: TransactionType) {
+    console.log(`AVISO: checkPayment para ${transaction.id} não executa mais - use o microserviço de pagamentos`);
+    return { status: 'skipped', reason: 'Função migrada para microserviço' };
   }
 
   public async cancelExpiredTransactions() {
-    return this.paymentChecker.cancelExpiredTransactions();
+    console.log('AVISO: cancelExpiredTransactions não executa mais - use o microserviço de pagamentos');
+    return { status: 'success', cancelled: 0, message: 'Função migrada para microserviço' };
   }
 }
 
-// Também exportar a implementação modular para uso direto se necessário
-export { PaymentChecker };
-export { PaymentStatusManager } from './payment/PaymentStatusManager';
-export { TransactionProcessor } from './payment/TransactionProcessor';
-export { ExpirationChecker } from './payment/ExpirationChecker';
-
-// Exportar os tipos
-export type { 
-  TransactionType, 
-  PaymentStatusResult, 
-  TransactionProcessResult,
-  ExpirationCheckResult,
-  ExpiredCancellationResult,
-  PaymentCheckerStartResult,
-  PendingPaymentsCheckResult,
-  PaymentStatus
-} from './payment/types';
-
 /**
- * Inicia o processamento de pagamentos pendentes
- * @returns Resultado do processamento
+ * Função stub para manter compatibilidade
  */
-export async function processApprovedPayments(): Promise<{ success: boolean; message?: string; error?: string }> {
-  try {
-    // Log reduzido - funcionalidade migrada para microserviço
-    
-    const supabase = createClient();
-    
-    // Buscar transações aprovadas que ainda não têm ordem criada
-    const { data: transactions, error } = await supabase
-      .from('core_transactions_v2')
-      .select('*')
-      .eq('status', 'approved')
-      .is('order_created', false)
-      .limit(10);
-      
-    if (error) {
-      console.error('Erro ao buscar transações aprovadas:', error);
-      return { success: false, error: error.message };
-    }
-    
-    if (!transactions || transactions.length === 0) {
-      return { success: true, message: 'Nenhuma transação pendente' };
-    }
-    
-    // Verificar posts selecionados por transação para análise prévia
-    const transactionPostsDetails = [];
-    
-    for (const transaction of transactions) {
-      try {
-        // Buscar posts da transação na tabela core_transaction_posts_v2
-        const { data: posts } = await supabase
-          .from('core_transaction_posts_v2')
-          .select('*')
-          .eq('transaction_id', transaction.id);
-          
-        if (posts && posts.length > 0) {
-          // Todos os posts são considerados selecionados por padrão
-          transactionPostsDetails.push({
-            transactionId: transaction.id,
-            totalPosts: posts.length,
-            selectedPosts: posts.length,  // Todos os posts são considerados selecionados
-            hasSelectedPosts: true  // Se houver posts, eles são considerados selecionados
-          });
-        } else {
-          transactionPostsDetails.push({
-            transactionId: transaction.id,
-            totalPosts: 0,
-            selectedPosts: 0,
-            hasSelectedPosts: false
-          });
-        }
-      } catch (err) {
-        console.error(`Erro ao verificar posts da transação ${transaction.id}:`, err);
-      }
-    }
-    
-    // Abordagem alternativa para verificar transações que já têm ordens
-    const transactionsWithOrders = new Set();
-    
-    // Verificar uma a uma para evitar o uso do group
-    for (const transactionId of transactions.map(t => t.id)) {
-      const { count, error: countError } = await supabase
-        .from('core_orders')
-        .select('*', { count: 'exact', head: true })
-        .eq('transaction_id', transactionId)
-        .neq('status', 'error');
-        
-      if (!countError && count && count > 0) {
-        transactionsWithOrders.add(transactionId);
-      }
-    }
-    
-    // Processar cada transação
-    const transactionProcessor = new TransactionProcessor(supabase);
-    const orderProcessor = new OrderProcessor(supabase);
-    
-    let processedCount = 0;
-    let skippedCount = 0;
-    let errorCount = 0;
-    
-    for (const transaction of transactions) {
-      try {
-        // Verificar se a transação já tem ordens
-        if (transactionsWithOrders.has(transaction.id)) {
-          // Atualizar o status order_created para true
-          await supabase
-            .from('core_transactions_v2')
-            .update({
-              order_created: true,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', transaction.id);
-            
-          skippedCount++;
-          continue;
-        }
-        
-        // Verificar se tem posts para essa transação
-        const postsDetail = transactionPostsDetails.find(p => p.transactionId === transaction.id);
-        
-        if (postsDetail && postsDetail.totalPosts === 0) {
-          console.warn(`⚠️ ATENÇÃO: Transação ${transaction.id} não tem posts associados!`);
-        }
-        
-        const result = await transactionProcessor.processTransaction(transaction);
-        
-        if (result && result.status === 'processed') {
-          processedCount++;
-        } else {
-          console.warn(`Transação ${transaction.id} não foi processada: ${result?.reason || 'Razão desconhecida'}`);
-          errorCount++;
-        }
-      } catch (error) {
-        console.error(`Erro ao processar transação ${transaction.id}:`, error);
-        errorCount++;
-      }
-      
-      // Pequena pausa para não sobrecarregar o banco de dados
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
-    
-    // Processar pedidos pendentes para envio ao provedor apenas uma vez após todas as transações
-    if (processedCount > 0) {
-      const processingResult = await orderProcessor.processPendingOrders();
-    }
-    
-    return { 
-      success: true, 
-      message: `Processamento concluído: ${processedCount} transações processadas, ${skippedCount} puladas, ${errorCount} com erro.` 
-    };
-  } catch (error) {
-    console.error('Erro ao processar pagamentos aprovados:', error);
-    return { success: false, error: String(error) };
-  }
+export async function processApprovedPayments(): Promise<{ success: boolean; message?: string }> {
+  console.log('AVISO: processApprovedPayments não executa mais - use o microserviço de pagamentos');
+  return { success: true, message: 'Função migrada para microserviço de pagamentos' };
 } 
