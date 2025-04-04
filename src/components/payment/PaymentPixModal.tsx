@@ -77,6 +77,7 @@ function ExpireTimer({ expiresAt }: { expiresAt: Date }) {
   );
 }
 
+// Simplifying the component - removing all UI rendering and focusing only on redirection
 export default function PaymentPixModal({
   isOpen,
   onClose,
@@ -88,64 +89,63 @@ export default function PaymentPixModal({
   serviceName = '',
   returnUrl = 'https://viralizamos.com/agradecimento'
 }: PaymentPixModalProps) {
-  const router = useRouter();
-  const [redirecting, setRedirecting] = useState(false);
+  // Use a single ref to track if we've redirected
+  const [hasRedirected, setHasRedirected] = useState(false);
   
-  // Only attempt redirect if component is mounted
-  const [mounted, setMounted] = useState(false);
+  // Separate side effect from component rendering cycle
   useEffect(() => {
-    setMounted(true);
-    return () => setMounted(false);
-  }, []);
-  
-  useEffect(() => {
-    // Only redirect if modal is open, component is mounted, and we're not already redirecting
-    if (mounted && isOpen && serviceId && profileData?.username && amount && !redirecting) {
+    // Only attempt redirection if we haven't already and the modal is open
+    if (isOpen && !hasRedirected && typeof window !== 'undefined') {
       try {
-        setRedirecting(true);
-        redirectToPaymentService();
+        // Mark as redirected immediately to prevent multiple redirects
+        setHasRedirected(true);
+        
+        // Create payment data object
+        const paymentData = {
+          amount,
+          service_id: serviceId,
+          profile_username: profileData?.username || '',
+          customer_email: customerEmail || 'cliente@exemplo.com',
+          customer_name: customerName || 'Cliente',
+          service_name: serviceName || 'Serviço Viralizamos',
+          return_url: returnUrl
+        };
+        
+        // Encode as base64 using browser's native API
+        const jsonString = JSON.stringify(paymentData);
+        const base64Data = btoa(encodeURIComponent(jsonString));
+        
+        // Build payment URL
+        const paymentServiceUrl = process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || 'https://pagamentos.viralizamos.com';
+        const paymentUrl = `${paymentServiceUrl}/pagamento/pix#${base64Data}`;
+        
+        // Redirect to payment service in the browser
+        window.location.href = paymentUrl;
       } catch (error) {
-        console.error('Erro ao redirecionar para o serviço de pagamento:', error);
-        setRedirecting(false);
-        // If there's an onClose handler, call it to close the modal on error
+        console.error('Erro ao redirecionar para serviço de pagamento:', error);
+        // If redirect fails, reset flag and close modal if possible
+        setHasRedirected(false);
         if (onClose) onClose();
       }
     }
-  }, [isOpen, serviceId, profileData, amount, mounted, redirecting]);
-  
-  const redirectToPaymentService = () => {
-    if (typeof window === 'undefined') return; // Guard against server-side execution
     
-    // Criar objeto com dados do pagamento
-    const paymentData: PaymentData = {
-      amount,
-      service_id: serviceId,
-      profile_username: profileData.username,
-      customer_email: customerEmail || 'cliente@exemplo.com',
-      customer_name: customerName || 'Cliente',
-      service_name: serviceName || 'Serviço Viralizamos',
-      return_url: returnUrl
-    };
-    
-    try {
-      // Codificar dados em base64 usando API nativa do browser
-      const jsonString = JSON.stringify(paymentData);
-      const base64Data = btoa(encodeURIComponent(jsonString));
-      
-      // Construir URL para o serviço de pagamento
-      const paymentUrl = `${process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || 'https://pagamentos.viralizamos.com'}/pagamento/pix#${base64Data}`;
-      
-      // Usar setTimeout para garantir que o redirect aconteça depois de toda a lógica React
-      setTimeout(() => {
-        // Redirecionar para o serviço de pagamento
-        window.location.href = paymentUrl;
-      }, 0);
-    } catch (error) {
-      console.error('Erro ao preparar dados para redirecionamento:', error);
-      throw error;
+    // When modal closes, reset the redirect flag for next time
+    if (!isOpen && hasRedirected) {
+      setHasRedirected(false);
     }
-  };
+  }, [
+    isOpen, 
+    hasRedirected, 
+    serviceId, 
+    profileData, 
+    amount, 
+    customerEmail, 
+    customerName, 
+    serviceName, 
+    returnUrl, 
+    onClose
+  ]);
   
-  // O componente não renderiza nada, apenas redireciona
+  // Don't render anything - this component only handles redirection
   return null;
 }
