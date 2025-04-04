@@ -13,6 +13,9 @@ export default function RedirecionamentoPagamento() {
   const searchParams = useSearchParams();
   const [erro, setErro] = useState<string | null>(null);
   const [redirecionando, setRedirecionando] = useState(true);
+  
+  // Definir a URL do serviço de pagamento para uso no useEffect
+  const paymentServiceUrl = process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || 'https://pagamentos.viralizamos.com';
 
   useEffect(() => {
     // Recuperar parâmetros da URL
@@ -58,11 +61,8 @@ export default function RedirecionamentoPagamento() {
       // Codificar em base64
       const base64Data = btoa(encodeURIComponent(jsonData));
       
-      // URL do microserviço
-      const microserviceUrl = process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || 'https://pagamentos.viralizamos.com';
-      
-      // URL final para redirecionamento
-      const redirectUrl = `${microserviceUrl}/pagamento/pix#${base64Data}`;
+      // URL final para redirecionamento usando a constante definida no escopo externo
+      const redirectUrl = `${paymentServiceUrl}/pagamento/pix#${base64Data}`;
       
       console.log('Redirecionando para:', redirectUrl);
       
@@ -78,7 +78,7 @@ export default function RedirecionamentoPagamento() {
       setErro(error instanceof Error ? error.message : 'Erro desconhecido');
       setRedirecionando(false);
     }
-  }, [searchParams]);
+  }, [searchParams, paymentServiceUrl]); // Adicionar paymentServiceUrl como dependência
 
   // Renderizar uma página simples de redirecionamento
   return (
