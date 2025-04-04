@@ -3,31 +3,32 @@
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment, useEffect, useState, useCallback } from 'react';
 import { PaymentSuccessModal } from './PaymentSuccessModal';
+import { useRouter } from 'next/navigation';
+import { encode as base64encode } from 'base-64';
 
 interface PaymentPixModalProps {
   isOpen: boolean;
   onClose: () => void;
-  serviceId?: string;
-  targetProfileLink?: string;
-  serviceName?: string;
-  amount?: number;
-  customerData?: {
-    name: string;
-    email: string;
-    phone: string;
-  };
-  profileData?: {
+  serviceId: string;
+  profileData: {
     username: string;
-    full_name?: string;
   };
-  postsData?: Array<any>;
+  amount: number;
+  onPaymentConfirmed?: (paymentId: string) => void;
+  customerEmail?: string;
+  customerName?: string;
+  serviceName?: string;
+  returnUrl?: string;
 }
 
-// Definir interface PixData no início do arquivo
-interface PixData {
-  qrCode: string;
-  qrCodeBase64: string;
-  paymentId?: string;
+interface PaymentData {
+  amount: number;
+  service_id: string;
+  profile_username: string;
+  customer_email: string;
+  customer_name: string;
+  service_name: string;
+  return_url: string;
 }
 
 // Componente para mostrar o timer de expiração
@@ -77,66 +78,47 @@ function ExpireTimer({ expiresAt }: { expiresAt: Date }) {
   );
 }
 
-export function PaymentPixModal({ 
-  isOpen, 
-  onClose, 
+export default function PaymentPixModal({
+  isOpen,
   serviceId,
-  targetProfileLink,
-  serviceName,
-  amount,
-  customerData,
   profileData,
-  postsData
+  amount,
+  customerEmail = '',
+  customerName = '',
+  serviceName = '',
+  returnUrl = 'https://viralizamos.com/agradecimento'
 }: PaymentPixModalProps) {
-  const [serviceUrl] = useState<string>(
-    process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || 'https://pagamentos.viralizamos.com'
-  );
-
-  // Redirecionar diretamente para o microserviço quando o modal é aberto
+  const router = useRouter();
+  
   useEffect(() => {
-    if (isOpen && serviceId && profileData?.username && amount) {
+    // Redirecionar para o serviço de pagamento quando o modal é aberto
+    if (isOpen && serviceId && profileData.username && amount) {
       redirectToPaymentService();
     }
   }, [isOpen, serviceId, profileData, amount]);
-
-  // Função para redirecionar diretamente para o microserviço de pagamentos
-  const redirectToPaymentService = async () => {
-    if (!serviceId || !profileData?.username || !amount) {
-      console.error('Dados insuficientes para pagamento');
-      onClose();
-      return;
-    }
-
-    try {
-      console.log('Redirecionando para serviço de pagamento:', {
-        amount,
-        serviceId,
-        profile: profileData.username
-      });
-
-      // Construir a URL de pagamento com parâmetros para redirecionamento após o pagamento
-      const currentUrl = window.location.origin;
-      const returnUrl = `${currentUrl}/agradecimento`;
-      
-      const paymentUrl = `${serviceUrl}/pagamento/pix?` + new URLSearchParams({
-        amount: amount.toString(),
-        service_id: serviceId,
-        profile_username: profileData.username,
-        customer_email: customerData?.email || '',
-        customer_name: customerData?.name || '',
-        service_name: serviceName || '',
-        return_url: returnUrl
-      }).toString();
-
-      // Redirecionar para a página de pagamento
-      window.location.href = paymentUrl;
-      
-    } catch (error) {
-      console.error('Erro ao redirecionar para pagamento:', error);
-      onClose();
-    }
+  
+  const redirectToPaymentService = () => {
+    // Criar objeto com dados do pagamento
+    const paymentData: PaymentData = {
+      amount,
+      service_id: serviceId,
+      profile_username: profileData.username,
+      customer_email: customerEmail || 'cliente@exemplo.com',
+      customer_name: customerName || 'Cliente',
+      service_name: serviceName || 'Serviço Viralizamos',
+      return_url: returnUrl
+    };
+    
+    // Codificar dados em base64
+    const paymentDataBase64 = base64encode(JSON.stringify(paymentData));
+    
+    // Construir URL para o serviço de pagamento
+    const paymentUrl = `${process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || 'https://pagamentos.viralizamos.com'}/pagamento/pix#${paymentDataBase64}`;
+    
+    // Redirecionar para o serviço de pagamento
+    window.location.href = paymentUrl;
   };
-
-  // Não renderizar o modal, apenas usar o efeito para redirecionar
+  
+  // O componente não renderiza nada, apenas redireciona
   return null;
 }
