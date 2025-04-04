@@ -466,12 +466,14 @@ function ReelsStep2Content() {
       {paymentData && (
         <PaymentPixModal
           isOpen={!!paymentData}
-          onClose={() => {}}
-          qrCodeText={paymentData.qrCodeText}
-          qrCodeBase64={paymentData.qrCodeBase64}
-          paymentId={paymentData.paymentId}
+          onClose={() => setPaymentData(null)}
+          serviceId={service?.id || ''}
+          profileData={{ username: profileData?.username || '' }}
           amount={paymentData.amount}
-          onPaymentConfirmed={handleRedirectToThankYou}
+          customerEmail={formData.email}
+          customerName={formData.name}
+          serviceName={service?.name || 'Serviço Viralizamos'}
+          returnUrl="/agradecimento"
         />
       )}
     </div>

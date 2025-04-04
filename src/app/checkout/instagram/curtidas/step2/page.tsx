@@ -1153,12 +1153,15 @@ export default function Step2Page() {
       {paymentData ? (
         <div className="mt-6">
           <PaymentPixModal
-            qrCodeText={paymentData.qrCodeText}
-            qrCodeBase64={paymentData.qrCodeBase64}
-            amount={paymentData.amount}
-            paymentId={paymentData.paymentId}
-            onClose={() => setPaymentData(null)}
             isOpen={!!paymentData}
+            onClose={() => setPaymentData(null)}
+            serviceId={service?.id || ''}
+            profileData={{ username: profileData?.username || '' }}
+            amount={paymentData.amount}
+            customerEmail={formData.email}
+            customerName={formData.name}
+            serviceName={service?.name || 'Serviço Viralizamos'}
+            returnUrl="/agradecimento"
           />
         </div>
       ) : null}
