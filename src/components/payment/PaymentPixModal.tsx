@@ -17,85 +17,95 @@ interface PaymentPixModalProps {
   returnUrl?: string;
 }
 
-// Função para gerar URL de pagamento separada do componente
-function generatePaymentUrl(props: PaymentPixModalProps) {
-  try {
-    // Extrair props
-    const { 
-      serviceId, 
-      profileData, 
-      amount, 
-      customerEmail = '', 
-      customerName = '', 
-      serviceName = '', 
-      returnUrl = 'https://viralizamos.com/agradecimento' 
-    } = props;
-    
-    // Validar dados críticos
-    if (!serviceId || !profileData?.username || !amount) {
-      console.error('Dados inválidos para geração de URL:', { serviceId, profileData, amount });
-      return '';
-    }
-    
-    // Gerar dados de pagamento
-    const paymentData = {
-      amount,
-      service_id: serviceId,
-      profile_username: profileData.username,
-      customer_email: customerEmail || 'cliente@exemplo.com',
-      customer_name: customerName || 'Cliente',
-      service_name: serviceName || 'Serviço Viralizamos',
-      return_url: returnUrl
-    };
-    
-    // Codificar dados em base64
-    const jsonString = JSON.stringify(paymentData);
-    const base64Data = btoa(encodeURIComponent(jsonString));
-    
-    // Construir URL
-    const paymentServiceUrl = process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || 'https://pagamentos.viralizamos.com';
-    return `${paymentServiceUrl}/pagamento/pix#${base64Data}`;
-  } catch (error) {
-    console.error('Erro ao gerar URL de pagamento:', error);
-    return '';
-  }
-}
-
-// O componente é extremamente simples - apenas um redirecionamento direto
+/**
+ * IMPORTANTE: Este componente não é mais um modal.
+ * Ele é apenas um redirecionador para a página de pagamento do microserviço,
+ * mas mantém a mesma interface para não quebrar o código existente.
+ */
 export default function PaymentPixModal(props: PaymentPixModalProps) {
-  const linkRef = useRef<HTMLAnchorElement>(null);
-  
-  // Não renderizar nada se não estiver aberto
-  if (!props.isOpen) return null;
-  
-  // Gerar a URL de pagamento
-  const paymentUrl = generatePaymentUrl(props);
-  
-  // Se não conseguimos gerar a URL, não renderizar nada
-  if (!paymentUrl) {
-    console.error('Não foi possível gerar URL de pagamento com os dados fornecidos');
-    if (props.onClose) props.onClose();
-    return null;
+  // Função que executa o redirecionamento diretamente
+  function redirecionarParaPagamento() {
+    try {
+      // Extrair dados das props
+      const { 
+        serviceId, 
+        profileData, 
+        amount, 
+        customerEmail = '', 
+        customerName = '', 
+        serviceName = '', 
+        returnUrl = 'https://viralizamos.com/agradecimento' 
+      } = props;
+      
+      console.log('Preparando redirecionamento para pagamento:', { 
+        serviceId, 
+        username: profileData?.username, 
+        amount 
+      });
+      
+      // Verificar dados obrigatórios
+      if (!serviceId) {
+        console.error('Redirecionamento falhou: serviceId não fornecido');
+        return false;
+      }
+      
+      if (!profileData?.username) {
+        console.error('Redirecionamento falhou: username não fornecido');
+        return false;
+      }
+      
+      if (!amount) {
+        console.error('Redirecionamento falhou: amount não fornecido');
+        return false;
+      }
+      
+      // Preparar dados para codificação
+      const paymentData = {
+        amount,
+        service_id: serviceId,
+        profile_username: profileData.username,
+        customer_email: customerEmail || 'cliente@exemplo.com',
+        customer_name: customerName || 'Cliente',
+        service_name: serviceName || 'Serviço Viralizamos',
+        return_url: returnUrl
+      };
+      
+      // Codificar em base64
+      let base64Data = '';
+      try {
+        const jsonString = JSON.stringify(paymentData);
+        base64Data = btoa(encodeURIComponent(jsonString));
+      } catch (e) {
+        console.error('Erro ao codificar dados:', e);
+        return false;
+      }
+      
+      // Construir URL final
+      const paymentServiceUrl = process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || 'https://pagamentos.viralizamos.com';
+      const url = `${paymentServiceUrl}/pagamento/pix#${base64Data}`;
+      
+      // Iniciar redirecionamento
+      console.log('Redirecionando para:', url);
+      window.location.href = url;
+      
+      return true;
+    } catch (error) {
+      console.error('Erro durante redirecionamento:', error);
+      return false;
+    }
   }
   
-  // Acionar o redirecionamento automaticamente ao renderizar
-  if (typeof window !== 'undefined') {
-    // Redirecionamento direto para evitar problemas com o React
-    window.location.href = paymentUrl;
+  // Se o modal estiver "aberto", executamos o redirecionamento
+  if (props.isOpen && typeof window !== 'undefined') {
+    // Executar redirecionamento imediatamente
+    const resultado = redirecionarParaPagamento();
     
-    // Retornar null para não renderizar nada
-    return null;
+    // Se falhar e houver callback de fechamento, chamá-lo
+    if (!resultado && props.onClose) {
+      props.onClose();
+    }
   }
   
-  // Caso o redirecionamento direto falhe, fornecemos um link de fallback
-  return (
-    <a 
-      ref={linkRef}
-      href={paymentUrl}
-      style={{ position: 'absolute', top: '-9999px', left: '-9999px' }}
-      id="payment-redirect-link"
-    >
-      Redirecionar para pagamento
-    </a>
-  );
+  // Este componente não renderiza nada visualmente
+  return null;
 }
