@@ -3,6 +3,8 @@
  * Independente do React e de qualquer outro componente
  */
 
+import { ServicePaymentProps } from '@/types/payment';
+
 // Tipos para os dados de pagamento
 export interface PaymentRedirectData {
   // Dados do serviço
@@ -123,79 +125,22 @@ export function redirectToPaymentService(data: PaymentRedirectData): boolean {
 }
 
 /**
- * Redireciona o usuário para a página de redirecionamento intermediária, que então
- * encaminhará para o microserviço de pagamentos.
- * 
- * Esta função resolve problemas de ciclo de vida do React, garantindo maior confiabilidade.
- * 
- * @param data Dados do pagamento
- * @returns Promise<boolean> indicando sucesso ou falha
+ * Redireciona o usuário diretamente para a página de pagamento
+ * Esta abordagem evita erros relacionados ao ciclo de vida do React
  */
-export async function directRedirectToPaymentService(data: PaymentRedirectData): Promise<boolean> {
-  try {
-    console.log('[PAGAMENTO] Iniciando redirecionamento via página intermediária:', data);
-    
-    // Validação de dados obrigatórios
-    if (!data.serviceId) {
-      console.error('[PAGAMENTO] ERRO: ID do serviço não informado');
-      return false;
-    }
-    
-    if (!data.profileUsername) {
-      console.error('[PAGAMENTO] ERRO: Nome de usuário do perfil não informado');
-      return false;
-    }
-    
-    if (!data.amount || data.amount <= 0) {
-      console.error('[PAGAMENTO] ERRO: Valor inválido:', data.amount);
-      return false;
-    }
-    
-    // Construir a URL para a página de redirecionamento
-    const params = new URLSearchParams({
-      service_id: data.serviceId,
-      service_name: data.serviceName || 'Serviço Viralizamos',
-      username: data.profileUsername,
-      amount: data.amount.toString(),
-      customer_name: data.customerName || 'Cliente',
-      customer_email: data.customerEmail || 'cliente@viralizamos.com',
-      customer_phone: data.customerPhone || '',
-      return_url: data.returnUrl || '/agradecimento'
-    });
-    
-    // URL completa para a página de redirecionamento
-    const redirectUrl = `/pagamento-direto?${params.toString()}`;
-    
-    console.log('[PAGAMENTO] Redirecionando para a página intermediária:', redirectUrl);
-    
-    // Atualizar os dados no localStorage para garantir que estejam disponíveis 
-    // para a página de redirecionamento
-    localStorage.setItem('checkoutProfileData', JSON.stringify({
-      serviceId: data.serviceId,
-      serviceName: data.serviceName,
-      profileData: {
-        username: data.profileUsername
-      },
-      amount: data.amount,
-      name: data.customerName,
-      email: data.customerEmail,
-      phone: data.customerPhone
-    }));
-    
-    // Redirecionar para a página intermediária
-    window.location.href = redirectUrl;
-    
-    return true;
-  } catch (error) {
-    console.error('[PAGAMENTO] Erro crítico durante o redirecionamento:', error);
-    
-    // Mostrar mensagem ao usuário como último recurso
-    try {
-      alert('Erro ao redirecionar para a página de pagamento. Por favor, contacte o suporte.');
-    } catch {
-      // Silenciar qualquer erro ao mostrar o alerta
-    }
-    
-    return false;
-  }
+export function directRedirectToPaymentService(data: ServicePaymentProps) {
+  // Salvar dados de perfil no localStorage para serem recuperados
+  // pela página intermediária de pagamento
+  localStorage.setItem('checkoutProfileData', JSON.stringify(data));
+  
+  // Extrair apenas os dados necessários para a URL
+  const { serviceId, amount } = data;
+  
+  // Criar URL simplificada
+  const queryParams = new URLSearchParams();
+  queryParams.set('sid', serviceId); // Somente o ID do serviço, sem nome
+  queryParams.set('a', amount.toString());
+  
+  // Redirecionar para a página intermediária com parâmetros mínimos
+  window.location.href = `/pagamento-direto?${queryParams.toString()}`;
 } 

@@ -137,4 +137,64 @@ export interface PixPaymentResult {
   duplicate?: boolean;
   existingPayment?: DuplicatePaymentInfo;
   reused?: boolean;
+}
+
+/**
+ * Interfaces para processamento de pagamentos
+ */
+
+/**
+ * Dados básicos para redirecionamento de pagamento
+ */
+export interface ServicePaymentProps {
+  serviceId: string;
+  serviceName: string;
+  profileData?: {
+    username: string;
+    [key: string]: any;
+  };
+  amount: number;
+  name?: string;
+  email?: string;
+  phone?: string;
+  quantity?: number;
+  returnUrl?: string;
+  [key: string]: any;  // Para permitir propriedades adicionais
+}
+
+/**
+ * Dados completos para processamento de pagamento
+ */
+export interface PaymentData {
+  service_id: string;
+  service_name: string;
+  profile_username: string;
+  amount: number;
+  customer_name: string;
+  customer_email: string;
+  customer_phone?: string;
+  quantity?: number;
+  return_url: string;
+  posts?: PostData[];
+}
+
+/**
+ * Dados de um post ou reel
+ */
+export interface PostData {
+  id: string;
+  code: string;
+  type: 'post' | 'reel';
+  url: string;
+}
+
+/**
+ * Dados retornados pelo processador de pagamento
+ */
+export interface PaymentResponse {
+  payment_id: string;
+  qr_code: string;
+  qr_code_base64: string;
+  status: string;
+  external_reference?: string;
 } 

@@ -2,6 +2,7 @@
 
 import { useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { PaymentData, PostData } from '@/types/payment';
 
 // Configuração para evitar pré-renderização estática
 export const dynamic = 'force-dynamic';
@@ -28,60 +29,46 @@ function PagamentoDiretoContent() {
       try {
         // 1. Verificar dados da URL
         const params = new URLSearchParams(window.location.search);
+        const serviceId = params.get('sid') || params.get('service_id') || '';
+        const amount = params.get('a') || params.get('amount') || '0';
         
-        // 2. Ou recuperar do localStorage se não estiver na URL
+        // 2. Recuperar dados do localStorage
         const storedData = localStorage.getItem('checkoutProfileData');
-        const parsedData = storedData ? JSON.parse(storedData) : {};
+        if (!storedData) {
+          throw new Error('Dados do serviço não encontrados');
+        }
         
-        // 3. Combinar dados da URL e localStorage
-        const serviceId = params.get('service_id') || parsedData.serviceId || '';
-        const username = params.get('username') || (parsedData.profileData ? parsedData.profileData.username : '');
-        const amount = params.get('amount') || parsedData.amount || '0';
+        const parsedData = JSON.parse(storedData);
         
-        // 4. Recuperar dados dos posts/reels selecionados
+        // 3. Recuperar dados dos posts/reels selecionados
         const selectedPostsJSON = localStorage.getItem('selectedPosts');
         const selectedReelsJSON = localStorage.getItem('selectedReels');
         
         const selectedPosts = selectedPostsJSON ? JSON.parse(selectedPostsJSON) : [];
         const selectedReels = selectedReelsJSON ? JSON.parse(selectedReelsJSON) : [];
         
-        // 5. Informações do cliente
-        const customerName = params.get('customer_name') || parsedData.name || '';
-        const customerEmail = params.get('customer_email') || parsedData.email || '';
-        const customerPhone = params.get('customer_phone') || parsedData.phone || '';
-        
-        // 6. Outras informações importantes
-        const serviceName = params.get('service_name') || parsedData.serviceName || '';
-        const quantity = params.get('quantity') || parsedData.quantity || '0';
+        // 4. Extrair informações relevantes
+        const username = parsedData.profileData?.username || parsedData.profile_username || '';
+        const customerName = parsedData.name || parsedData.customer_name || '';
+        const customerEmail = parsedData.email || parsedData.customer_email || '';
+        const customerPhone = parsedData.phone || parsedData.customer_phone || '';
+        const serviceName = parsedData.serviceName || parsedData.service_name || '';
+        const quantity = parsedData.quantity || '0';
         
         // Log detalhado para debugging
         console.log("Dados recuperados:", {
-          url: {
-            serviceId: params.get('service_id'),
-            username: params.get('username'),
-            amount: params.get('amount'),
-            customerName: params.get('customer_name'),
-            customerEmail: params.get('customer_email'),
-            serviceName: params.get('service_name')
-          },
-          localStorage: {
-            serviceId: parsedData.serviceId,
-            username: parsedData.profileData?.username,
-            amount: parsedData.amount,
-            customerName: parsedData.name,
-            customerEmail: parsedData.email,
-            serviceName: parsedData.serviceName
-          },
+          url: { serviceId, amount },
+          localStorage: { ...parsedData },
           selectedPosts: selectedPosts.length,
           selectedReels: selectedReels.length
         });
         
         // Construir objeto completo de dados
-        const paymentData = {
+        const paymentData: PaymentData = {
           service_id: serviceId,
           service_name: serviceName,
           profile_username: username,
-          amount: parseFloat(amount),
+          amount: parseFloat(amount || parsedData.amount || '0'),
           customer_name: customerName,
           customer_email: customerEmail,
           customer_phone: customerPhone,
@@ -90,7 +77,7 @@ function PagamentoDiretoContent() {
           
           // Adicionar todos os posts e reels selecionados
           posts: [
-            ...selectedPosts.map(post => {
+            ...selectedPosts.map((post: any): PostData => {
               // Garantir que temos valores de string para cada campo
               const postId = typeof post.id === 'undefined' ? '' : 
                               (typeof post.id === 'string' ? post.id.substring(0, 20) : post.id.toString().substring(0, 20));
@@ -104,7 +91,7 @@ function PagamentoDiretoContent() {
                 url: postCode ? 'https://instagram.com/p/' + postCode : ''
               };
             }),
-            ...selectedReels.map(reel => {
+            ...selectedReels.map((reel: any): PostData => {
               // Garantir que temos valores de string para cada campo
               const reelId = typeof reel.id === 'undefined' ? '' : 
                               (typeof reel.id === 'string' ? reel.id.substring(0, 20) : reel.id.toString().substring(0, 20));
@@ -126,23 +113,49 @@ function PagamentoDiretoContent() {
         // Converter para JSON
         const jsonData = JSON.stringify(paymentData);
         
-        // Criar um ID simplificado para o pedido usando apenas o ID do serviço
-        // Sem usar informações sensíveis ou caracteres especiais
+        // Criar um ID simplificado para o pedido - somente letras e números
         const timestamp = Date.now().toString(36);
-        const orderId = `${timestamp}-${serviceId.substring(0, 8)}`;
+        // Limpeza adicional: remover todos os caracteres especiais do ID
+        const cleanServiceId = serviceId.replace(/[^a-zA-Z0-9]/g, '').substring(0, 8);
+        // Criar um ID único e seguro para o pedido
+        const orderId = `${timestamp}-${cleanServiceId}`;
         
-        // Armazenar o payload completo no localStorage com esse ID
-        localStorage.setItem(`payment_data_${orderId}`, jsonData);
+        // Armazenar o payload completo no localStorage 
+        // Importante: armazenar em localStorage com a chave exata esperada pelo microserviço
+        const storageKey = `payment_data_${orderId}`;
+        localStorage.setItem(storageKey, jsonData);
         
-        // URL final para redirecionamento - usando apenas o orderId
+        console.log("Ordem de pagamento criada:", { orderId, storageKey });
+        
+        // Transmitir os dados para o domínio do pagamento usando sessionStorage
+        // Isso permite que os dados estejam disponíveis mesmo quando o localStorage não é compartilhado
+        try {
+          // Criar um iframe com o domínio de pagamento para sincronizar os dados
+          const iframe = document.createElement('iframe');
+          iframe.style.display = 'none';
+          iframe.src = `${paymentServiceUrl}/sync-payment-data?oid=${orderId}&key=${storageKey}&data=${encodeURIComponent(jsonData)}`;
+          document.body.appendChild(iframe);
+          
+          console.log("Dados de pagamento sincronizados com o serviço de pagamento");
+          
+          // Remover o iframe após alguns segundos
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+          }, 3000);
+        } catch (syncError) {
+          console.warn("Não foi possível sincronizar os dados via iframe: ", syncError);
+        }
+        
+        // URL final para redirecionamento (apenas com o ID da ordem)
         const redirectUrl = `${paymentServiceUrl}/pagamento/pix?oid=${orderId}`;
         
         console.log("Redirecionando para:", redirectUrl);
-        console.log("ID do pedido:", orderId);
         
-        // Redirecionar automaticamente
-        window.location.href = redirectUrl;
-      } catch (error) {
+        // Redirecionar automaticamente após um pequeno delay para permitir a sincronização
+        setTimeout(() => {
+          window.location.href = redirectUrl;
+        }, 1000);
+      } catch (error: any) {
         // Mostrar erro na UI
         const errorMessage = document.getElementById('error-message');
         const errorContainer = document.getElementById('error-container');
@@ -165,7 +178,7 @@ function PagamentoDiretoContent() {
     };
     
     // Executar o processamento após um pequeno delay para garantir que o DOM esteja pronto
-    setTimeout(processRedirection, 100);
+    setTimeout(processRedirection, 300);
     
     return () => {
       // Limpar a variável global de forma segura
