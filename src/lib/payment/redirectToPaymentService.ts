@@ -49,11 +49,16 @@ export async function redirectToPaymentService(paymentData: PaymentData): Promis
       profile_username: paymentData.profileUsername,
       customer_email: paymentData.customerEmail || 'cliente@viralizamos.com',
       customer_name: paymentData.customerName || 'Cliente',
+      customer_phone: paymentData.customerPhone || '',
       service_name: paymentData.serviceName || 'Serviço Viralizamos',
       return_url: paymentData.returnUrl || window.location.href,
       additional_data: {
         posts: paymentData.posts || [],
-        quantity: paymentData.quantity || 1
+        quantity: paymentData.quantity || 1,
+        source: 'viralizamos_site_v2',
+        origin: window.location.href,
+        redirect_method: 'payment-request',
+        timestamp: new Date().toISOString()
       }
     };
 
@@ -65,41 +70,81 @@ export async function redirectToPaymentService(paymentData: PaymentData): Promis
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Payment-Source': 'viralizamos-site-v2',
         },
         body: JSON.stringify(requestData),
       });
+
+      const responseText = await response.text();
+      console.log(`[PaymentRedirect] Resposta da API (status ${response.status}):`, responseText);
+
+      // Tentar converter para JSON
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (jsonError) {
+        console.error('[PaymentRedirect] Erro ao processar resposta como JSON:', jsonError);
+        throw new Error(`Resposta inválida do servidor: ${responseText.substring(0, 100)}`);
+      }
 
       if (!response.ok) {
         throw new Error(`Falha na criação da solicitação de pagamento: ${response.status}`);
       }
 
-      const data = await response.json();
       console.log('[PaymentRedirect] Solicitação de pagamento criada com sucesso:', data);
 
-      // Redirecionar para a URL de pagamento
-      if (data.payment_url) {
-        console.log('[PaymentRedirect] Redirecionando para:', data.payment_url);
-        window.location.href = data.payment_url;
-        return true;
-      } else {
+      // Verificar se a resposta contém URL de pagamento
+      if (!data.payment_url) {
+        console.error('[PaymentRedirect] URL de pagamento não retornada pela API:', data);
         throw new Error('URL de pagamento não retornada pela API');
       }
+
+      // Salvar token para verificação posterior
+      try {
+        if (data.token) {
+          localStorage.setItem('viralizamos_payment_token', data.token);
+          localStorage.setItem('viralizamos_payment_timestamp', new Date().toISOString());
+        }
+      } catch (storageError) {
+        console.warn('[PaymentRedirect] Não foi possível salvar token no localStorage:', storageError);
+      }
+
+      // Redirecionar para a URL de pagamento
+      console.log('[PaymentRedirect] Redirecionando para:', data.payment_url);
+      window.location.href = data.payment_url;
+      return true;
     } catch (apiError) {
       console.error('[PaymentRedirect] Erro ao criar solicitação via API, usando fallback:', apiError);
       
       // Fallback: usar método antigo baseado em localStorage
+      console.log('[PaymentRedirect] Ativando fallback para método baseado em localStorage');
       const timestamp = Date.now().toString(36);
       const orderId = `${timestamp}-${paymentData.serviceId.substring(0, 8).replace(/[^a-zA-Z0-9]/g, '')}`;
       const storageKey = `payment_data_${orderId}`;
       
-      localStorage.setItem(storageKey, JSON.stringify({
+      const storageData = {
         amount: paymentData.amount,
         service_id: paymentData.serviceId,
         profile_username: paymentData.profileUsername,
         customer_email: paymentData.customerEmail || 'cliente@viralizamos.com',
         customer_name: paymentData.customerName || 'Cliente',
+        customer_phone: paymentData.customerPhone || '',
         service_name: paymentData.serviceName || 'Serviço Viralizamos',
-        return_url: paymentData.returnUrl || window.location.href
+        return_url: paymentData.returnUrl || window.location.href,
+        posts: paymentData.posts || [],
+        quantity: paymentData.quantity || 1,
+        timestamp: new Date().toISOString(),
+        fallback_reason: apiError instanceof Error ? apiError.message : 'Erro desconhecido'
+      };
+      
+      console.log('[PaymentRedirect] Salvando dados no localStorage:', storageData);
+      localStorage.setItem(storageKey, JSON.stringify(storageData));
+      
+      // Também salvar uma cópia geral para resiliência
+      localStorage.setItem('viralizamos_payment', JSON.stringify({
+        ...storageData,
+        orderId,
+        storageKey
       }));
       
       const fallbackUrl = `${paymentServiceUrl}/pagamento/pix?oid=${orderId}`;
