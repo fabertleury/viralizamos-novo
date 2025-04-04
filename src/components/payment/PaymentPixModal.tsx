@@ -4,7 +4,6 @@ import { Dialog, Transition } from '@headlessui/react';
 import { Fragment, useEffect, useState, useCallback } from 'react';
 import { PaymentSuccessModal } from './PaymentSuccessModal';
 import { useRouter } from 'next/navigation';
-import { encode as base64encode } from 'base-64';
 
 interface PaymentPixModalProps {
   isOpen: boolean;
@@ -109,11 +108,12 @@ export default function PaymentPixModal({
       return_url: returnUrl
     };
     
-    // Codificar dados em base64
-    const paymentDataBase64 = base64encode(JSON.stringify(paymentData));
+    // Codificar dados em base64 usando API nativa do browser
+    const jsonString = JSON.stringify(paymentData);
+    const base64Data = btoa(encodeURIComponent(jsonString));
     
     // Construir URL para o serviço de pagamento
-    const paymentUrl = `${process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || 'https://pagamentos.viralizamos.com'}/pagamento/pix#${paymentDataBase64}`;
+    const paymentUrl = `${process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || 'https://pagamentos.viralizamos.com'}/pagamento/pix#${base64Data}`;
     
     // Redirecionar para o serviço de pagamento
     window.location.href = paymentUrl;
