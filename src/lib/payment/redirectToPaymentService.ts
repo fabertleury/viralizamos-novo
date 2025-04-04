@@ -4,6 +4,7 @@
  */
 
 import { ServicePaymentProps } from '@/types/payment';
+import { PaymentData } from '@/interfaces/payment';
 
 // Tipos para os dados de pagamento
 export interface PaymentRedirectData {
@@ -27,99 +28,87 @@ export interface PaymentRedirectData {
 }
 
 /**
- * Redireciona o usuário para o microserviço de pagamentos
- * Esta função é totalmente independente do React e pode ser chamada de qualquer lugar
+ * Redireciona para o serviço de pagamento
+ * Esta função centraliza a lógica de redirecionamento para microserviço de pagamentos
  */
-export function redirectToPaymentService(data: PaymentRedirectData): boolean {
+export async function redirectToPaymentService(paymentData: PaymentData): Promise<boolean> {
   try {
-    console.log('[PAGAMENTO] Iniciando redirecionamento:', data);
-    
-    // Validação de dados obrigatórios
-    if (!data.serviceId) {
-      console.error('[PAGAMENTO] ERRO: ID do serviço não informado');
-      return false;
+    console.log('[PaymentRedirect] Preparando redirecionamento para pagamento:', paymentData);
+
+    // URL do microserviço de pagamento
+    let paymentServiceUrl = process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL;
+    if (!paymentServiceUrl) {
+      console.warn('[PaymentRedirect] URL do serviço de pagamento não configurada em variáveis de ambiente. Usando URL padrão.');
+      paymentServiceUrl = 'https://pagamentos.viralizamos.com';
     }
-    
-    if (!data.profileUsername) {
-      console.error('[PAGAMENTO] ERRO: Nome de usuário do perfil não informado');
-      return false;
-    }
-    
-    if (!data.amount || data.amount <= 0) {
-      console.error('[PAGAMENTO] ERRO: Valor inválido:', data.amount);
-      return false;
-    }
-    
-    // Preparar dados para envio ao microserviço
-    const paymentData = {
-      service_id: data.serviceId,
-      service_name: data.serviceName || 'Serviço Viralizamos',
-      profile_username: data.profileUsername,
-      amount: data.amount,
-      customer_name: data.customerName || 'Cliente',
-      customer_email: data.customerEmail || 'cliente@viralizamos.com',
-      customer_phone: data.customerPhone || '',
-      return_url: data.returnUrl || window.location.href
-    };
-    
-    // Converter para JSON e codificar para URL
-    const jsonData = JSON.stringify(paymentData);
-    console.log('[PAGAMENTO] Dados JSON:', jsonData);
-    
-    // Codificar em base64 para transmissão segura
-    const base64Data = btoa(encodeURIComponent(jsonData));
-    console.log('[PAGAMENTO] Dados codificados (primeiros 50 caracteres):', base64Data.substring(0, 50));
-    
-    // Obter URL do microserviço
-    const microserviceUrl = process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || 'https://pagamentos.viralizamos.com';
-    
-    // Construir URL final com os dados no hash
-    const redirectUrl = `${microserviceUrl}/pagamento/pix#${base64Data}`;
-    console.log('[PAGAMENTO] URL de redirecionamento (primeiros 100 caracteres):', redirectUrl.substring(0, 100));
-    
-    // Método 1: Redirecionamento direto
-    window.location.href = redirectUrl;
-    
-    // Métodos de fallback (executados apenas se o redirecionamento principal falhar)
-    setTimeout(() => {
-      console.log('[PAGAMENTO] Tentando método alternativo de redirecionamento...');
-      
-      // Método 2: Criar um link e clicar nele
-      try {
-        const link = document.createElement('a');
-        link.href = redirectUrl;
-        link.target = '_self';
-        link.rel = 'noopener noreferrer';
-        link.style.display = 'none';
-        document.body.appendChild(link);
-        link.click();
-        setTimeout(() => {
-          document.body.removeChild(link);
-        }, 100);
-      } catch (e) {
-        console.error('[PAGAMENTO] Erro ao tentar método alternativo:', e);
-        
-        // Método 3: window.open como último recurso
-        try {
-          window.open(redirectUrl, '_self');
-        } catch (e2) {
-          console.error('[PAGAMENTO] Todos os métodos de redirecionamento falharam:', e2);
-          return false;
-        }
+
+    // Dados para enviar ao microserviço
+    const requestData = {
+      amount: paymentData.amount,
+      service_id: paymentData.serviceId,
+      profile_username: paymentData.profileUsername,
+      customer_email: paymentData.customerEmail || 'cliente@viralizamos.com',
+      customer_name: paymentData.customerName || 'Cliente',
+      service_name: paymentData.serviceName || 'Serviço Viralizamos',
+      return_url: paymentData.returnUrl || window.location.href,
+      additional_data: {
+        posts: paymentData.posts || [],
+        quantity: paymentData.quantity || 1
       }
-    }, 200);
-    
-    return true;
-  } catch (error) {
-    console.error('[PAGAMENTO] Erro crítico durante o redirecionamento:', error);
-    
-    // Mostrar mensagem ao usuário como último recurso
+    };
+
+    console.log('[PaymentRedirect] Enviando dados para API de solicitação de pagamento:', requestData);
+
     try {
-      alert('Erro ao redirecionar para a página de pagamento. Por favor, contacte o suporte.');
-    } catch {
-      // Silenciar qualquer erro ao mostrar o alerta
+      // Tentar usar o novo método baseado em banco de dados
+      const response = await fetch(`${paymentServiceUrl}/api/payment-request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Falha na criação da solicitação de pagamento: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('[PaymentRedirect] Solicitação de pagamento criada com sucesso:', data);
+
+      // Redirecionar para a URL de pagamento
+      if (data.payment_url) {
+        console.log('[PaymentRedirect] Redirecionando para:', data.payment_url);
+        window.location.href = data.payment_url;
+        return true;
+      } else {
+        throw new Error('URL de pagamento não retornada pela API');
+      }
+    } catch (apiError) {
+      console.error('[PaymentRedirect] Erro ao criar solicitação via API, usando fallback:', apiError);
+      
+      // Fallback: usar método antigo baseado em localStorage
+      const timestamp = Date.now().toString(36);
+      const orderId = `${timestamp}-${paymentData.serviceId.substring(0, 8).replace(/[^a-zA-Z0-9]/g, '')}`;
+      const storageKey = `payment_data_${orderId}`;
+      
+      localStorage.setItem(storageKey, JSON.stringify({
+        amount: paymentData.amount,
+        service_id: paymentData.serviceId,
+        profile_username: paymentData.profileUsername,
+        customer_email: paymentData.customerEmail || 'cliente@viralizamos.com',
+        customer_name: paymentData.customerName || 'Cliente',
+        service_name: paymentData.serviceName || 'Serviço Viralizamos',
+        return_url: paymentData.returnUrl || window.location.href
+      }));
+      
+      const fallbackUrl = `${paymentServiceUrl}/pagamento/pix?oid=${orderId}`;
+      console.log('[PaymentRedirect] Usando método antigo, redirecionando para:', fallbackUrl);
+      window.location.href = fallbackUrl;
+      return true;
     }
-    
+  } catch (error) {
+    console.error('[PaymentRedirect] Erro crítico no redirecionamento para pagamento:', error);
     return false;
   }
 }

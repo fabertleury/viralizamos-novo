@@ -133,21 +133,56 @@ function PagamentoDiretoContent() {
           // Criar um iframe com o domínio de pagamento para sincronizar os dados
           const iframe = document.createElement('iframe');
           iframe.style.display = 'none';
-          iframe.src = `${paymentServiceUrl}/sync-payment-data?oid=${orderId}&key=${storageKey}&data=${encodeURIComponent(jsonData)}`;
+          
+          // Registrar listener para mensagens de conclusão da sincronização
+          window.addEventListener('message', function syncMessageHandler(event) {
+            // Verificar se a mensagem é do iframe de sincronização
+            if (event.data && event.data.type === 'sync-complete' && event.data.orderId === orderId) {
+              console.log("Sincronização confirmada pelo microserviço:", event.data);
+              
+              // Remover o listener após receber a confirmação
+              window.removeEventListener('message', syncMessageHandler);
+              
+              // Redirecionar para a página de pagamento
+              const redirectUrl = `${paymentServiceUrl}/pagamento/pix?oid=${orderId}`;
+              console.log("Redirecionando para:", redirectUrl);
+              window.location.href = redirectUrl;
+            }
+          });
+          
+          // Gerar URL de sincronização com parâmetros de segurança adicionais
+          const syncUrl = `${paymentServiceUrl}/sync-payment-data?oid=${orderId}&key=${storageKey}&data=${encodeURIComponent(jsonData)}&t=${Date.now()}`;
+          console.log("Iniciando sincronização via iframe:", syncUrl.substring(0, 100) + "...");
+          
+          // Configurar o iframe e adicioná-lo ao DOM
+          iframe.src = syncUrl;
           document.body.appendChild(iframe);
           
-          console.log("Dados de pagamento sincronizados com o serviço de pagamento");
+          // Timeout para caso não recebamos a confirmação do iframe
+          const syncTimeout = setTimeout(() => {
+            console.log("Timeout na sincronização. Redirecionando diretamente...");
+            window.location.href = `${paymentServiceUrl}/pagamento/pix?oid=${orderId}`;
+          }, 5000);
           
-          // Remover o iframe após alguns segundos
-          setTimeout(() => {
-            try {
-              document.body.removeChild(iframe);
-            } catch (e) {
-              // Ignorar erro se o iframe já foi removido
+          // Também registrar o handler para limpar o timeout quando a sincronização for concluída
+          window.addEventListener('message', function onSyncComplete(event) {
+            if (event.data && event.data.type === 'sync-complete' && event.data.orderId === orderId) {
+              clearTimeout(syncTimeout);
+              window.removeEventListener('message', onSyncComplete);
             }
-          }, 3000);
+          });
         } catch (syncError) {
           console.warn("Não foi possível sincronizar os dados via iframe: ", syncError);
+          
+          // Fallback: abrir a URL de sincronização diretamente
+          try {
+            console.log("Tentando sincronização via redirecionamento direto...");
+            const syncUrl = `${paymentServiceUrl}/sync-payment-data?oid=${orderId}&key=${storageKey}&data=${encodeURIComponent(jsonData)}`;
+            window.location.href = syncUrl;
+            return; // Encerrar o processamento aqui, pois a sincronização redirecionará o usuário
+          } catch (redirectError) {
+            console.error("Erro no redirecionamento para sincronização:", redirectError);
+          }
         }
         
         // URL final para redirecionamento (apenas com o ID da ordem)
@@ -158,7 +193,7 @@ function PagamentoDiretoContent() {
         // Redirecionar automaticamente após um pequeno delay para permitir a sincronização
         setTimeout(() => {
           window.location.href = redirectUrl;
-        }, 1000);
+        }, 3000);
       } catch (error: any) {
         // Mostrar erro na UI
         const errorMessage = document.getElementById('error-message');
