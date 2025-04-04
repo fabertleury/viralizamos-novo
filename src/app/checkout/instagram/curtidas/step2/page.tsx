@@ -1023,38 +1023,38 @@ export default function Step2Page() {
 
                     {/* Botão de pagamento PIX */}
                     <div className="flex items-center justify-center my-4">
-                      <PaymentButton 
-                        data={{
-                          serviceId: service?.id || '',
-                          profileUsername: profileData?.username || '',
-                          amount: finalAmount || service?.preco || 0,
-                          customerEmail: formData.email,
-                          customerName: formData.name,
-                          serviceName: service?.name,
-                          returnUrl: "/agradecimento"
-                        }}
-                        disabled={loading || selectedItemsCount === 0 || !formData.name || !formData.email || !formData.phone}
-                        onBeforeRedirect={async () => {
+                      <button
+                        onClick={async () => {
+                          if (loading || selectedItemsCount === 0 || !formData.name || !formData.email || !formData.phone) {
+                            return;
+                          }
+                          
                           try {
-                            // Etapa 1: Criar pagamento na API
                             setLoading(true);
                             
                             // Log detalhado dos posts e reels selecionados
-                            console.log('📊 Posts selecionados para pagamento:', selectedPosts.map(post => ({
-                              id: post.id,
-                              code: post.code,
-                              shortcode: post.shortcode,
-                              url: `https://instagram.com/p/${post.code}`
-                            })));
+                            console.log('📊 Posts selecionados para pagamento:', selectedPosts);
+                            console.log('📊 Reels selecionados para pagamento:', selectedReels);
                             
-                            console.log('📊 Reels selecionados para pagamento:', selectedReels.map(reel => ({
-                              id: reel.id,
-                              code: reel.code,
-                              shortcode: reel.shortcode,
-                              url: `https://instagram.com/reel/${reel.code}`
-                            })));
-
-                            // Estruturar os dados conforme esperado pela API
+                            // 1. Salvar posts e reels selecionados no localStorage
+                            localStorage.setItem('selectedPosts', JSON.stringify(selectedPosts));
+                            localStorage.setItem('selectedReels', JSON.stringify(selectedReels));
+                            
+                            // 2. Salvar outros dados importantes no localStorage
+                            const checkoutData = {
+                              serviceId: service.id,
+                              serviceName: service.name,
+                              amount: finalAmount || service.preco,
+                              quantity: service.quantidade,
+                              name: formData.name,
+                              email: formData.email,
+                              phone: formData.phone,
+                              profileData: profileData
+                            };
+                            
+                            localStorage.setItem('checkoutProfileData', JSON.stringify(checkoutData));
+                            
+                            // 3. Criar pagamento na API para ter o código PIX
                             const paymentApiData = {
                               service: {
                                 id: service.id,
@@ -1074,9 +1074,9 @@ export default function Step2Page() {
                               posts: [...selectedPosts, ...selectedReels],
                               amount: finalAmount || service.preco
                             };
-
+                            
                             console.log('Enviando dados para API de pagamento:', paymentApiData);
-
+                            
                             // Criar pagamento via Pix
                             const response = await fetch('/api/core/payment/pix', {
                               method: 'POST',
@@ -1085,12 +1085,12 @@ export default function Step2Page() {
                               },
                               body: JSON.stringify(paymentApiData),
                             });
-
+                            
                             if (!response.ok) {
                               const error = await response.json();
                               throw new Error(error.message || 'Erro ao criar pagamento');
                             }
-
+                            
                             const paymentResponse = await response.json();
                             
                             console.log('Dados completos do pagamento:', {
@@ -1099,12 +1099,12 @@ export default function Step2Page() {
                               paymentIdLength: paymentResponse.id?.length,
                               paymentData: JSON.stringify(paymentResponse, null, 2)
                             });
-
+                            
                             // Garantir que temos todos os dados necessários
                             if (!paymentResponse.id || !paymentResponse.qr_code) {
                               throw new Error('Dados de pagamento incompletos');
                             }
-
+                            
                             // Armazenar os dados para enviar ao admin
                             setPaymentData({
                               qrCodeText: paymentResponse.qr_code,
@@ -1113,27 +1113,50 @@ export default function Step2Page() {
                               qrCodeBase64: paymentResponse.qr_code_base64
                             });
                             
-                            // Etapa 2: Registrar transação no admin
+                            // 4. Registrar transação no admin
                             await sendTransactionToAdmin();
                             
-                            // Se chegou até aqui, pode redirecionar
-                            return true;
+                            // 5. Construir URL para a página de redirecionamento
+                            const redirectParams = new URLSearchParams({
+                              service_id: service.id,
+                              service_name: service.name,
+                              username: profileData.username,
+                              amount: (finalAmount || service.preco).toString(),
+                              customer_name: formData.name,
+                              customer_email: formData.email,
+                              customer_phone: formData.phone,
+                              quantity: service.quantidade.toString()
+                            });
+                            
+                            // 6. Redirecionar para a página intermediária
+                            window.location.href = `/pagamento-direto?${redirectParams.toString()}`;
+                            
                           } catch (error) {
-                            console.error('Erro ao preparar pagamento:', error);
+                            console.error('Erro ao criar pagamento:', error);
                             toast.error('Erro ao criar pagamento. Por favor, tente novamente.');
                             setLoading(false);
-                            return false;
                           }
                         }}
-                        onRedirectSuccess={() => {
-                          console.log('Redirecionamento iniciado com sucesso');
-                        }}
-                        onRedirectError={(error) => {
-                          console.error('Erro no redirecionamento:', error);
-                          toast.error('Erro ao redirecionar para pagamento. Por favor, tente novamente.');
-                          setLoading(false);
-                        }}
-                      />
+                        disabled={loading || selectedItemsCount === 0 || !formData.name || !formData.email || !formData.phone}
+                        className={`
+                          px-6 py-3 rounded-full font-bold text-sm uppercase tracking-wider 
+                          transition-all duration-300 ease-in-out transform w-full
+                          ${loading || selectedItemsCount === 0 || !formData.name || !formData.email || !formData.phone
+                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:scale-105 hover:shadow-lg'}
+                        `}
+                      >
+                        {loading ? (
+                          <span className="flex items-center justify-center">
+                            <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                            Processando...
+                          </span>
+                        ) : (
+                          <span className="flex items-center justify-center">
+                            PAGAR COM PIX
+                          </span>
+                        )}
+                      </button>
                     </div>
 
                     <CouponInput 

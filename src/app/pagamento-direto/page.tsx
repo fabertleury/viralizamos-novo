@@ -1,0 +1,144 @@
+'use client';
+
+import { useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
+
+/**
+ * Página simples que redireciona diretamente para o microserviço de pagamento
+ * enviando todos os dados necessários.
+ * 
+ * Esta abordagem remove completamente qualquer dependência do React,
+ * garantindo que não haja problemas com o ciclo de renderização.
+ */
+export default function PagamentoDireto() {
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    // Script de redirecionamento executado uma única vez após a montagem do componente
+    const script = document.createElement('script');
+    script.innerHTML = `
+      // Recuperar todos os dados necessários
+      try {
+        // 1. Verificar dados da URL
+        const params = new URLSearchParams(window.location.search);
+        
+        // 2. Ou recuperar do localStorage se não estiver na URL
+        const storedData = localStorage.getItem('checkoutProfileData');
+        const parsedData = storedData ? JSON.parse(storedData) : {};
+        
+        // 3. Combinar dados da URL e localStorage
+        const serviceId = params.get('service_id') || parsedData.serviceId || '';
+        const username = params.get('username') || (parsedData.profileData ? parsedData.profileData.username : '');
+        const amount = params.get('amount') || parsedData.amount || '0';
+        
+        // 4. Recuperar dados dos posts/reels selecionados
+        const selectedPostsJSON = localStorage.getItem('selectedPosts');
+        const selectedReelsJSON = localStorage.getItem('selectedReels');
+        
+        const selectedPosts = selectedPostsJSON ? JSON.parse(selectedPostsJSON) : [];
+        const selectedReels = selectedReelsJSON ? JSON.parse(selectedReelsJSON) : [];
+        
+        // 5. Informações do cliente
+        const customerName = params.get('customer_name') || parsedData.name || '';
+        const customerEmail = params.get('customer_email') || parsedData.email || '';
+        const customerPhone = params.get('customer_phone') || parsedData.phone || '';
+        
+        // 6. Outras informações importantes
+        const serviceName = params.get('service_name') || parsedData.serviceName || '';
+        const quantity = params.get('quantity') || parsedData.quantity || '0';
+        
+        // Construir objeto completo de dados
+        const paymentData = {
+          service_id: serviceId,
+          service_name: serviceName,
+          profile_username: username,
+          amount: parseFloat(amount),
+          customer_name: customerName,
+          customer_email: customerEmail,
+          customer_phone: customerPhone,
+          quantity: parseInt(quantity),
+          return_url: '/agradecimento',
+          
+          // Adicionar todos os posts e reels selecionados
+          posts: [
+            ...selectedPosts.map(post => ({
+              id: post.id,
+              code: post.code || post.shortcode,
+              type: 'post',
+              url: post.code ? 'https://instagram.com/p/' + post.code : ''
+            })),
+            ...selectedReels.map(reel => ({
+              id: reel.id,
+              code: reel.code || reel.shortcode,
+              type: 'reel',
+              url: reel.code ? 'https://instagram.com/reel/' + reel.code : ''
+            }))
+          ]
+        };
+        
+        console.log("Dados de pagamento completos:", paymentData);
+        
+        // Converter para JSON e codificar
+        const jsonData = JSON.stringify(paymentData);
+        
+        // Codificar em base64
+        const base64Data = btoa(encodeURIComponent(jsonData));
+        
+        // URL do microserviço
+        const microserviceUrl = '${process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || "https://pagamentos.viralizamos.com"}';
+        
+        // URL final para redirecionamento
+        const redirectUrl = microserviceUrl + '/pagamento/pix#' + base64Data;
+        
+        console.log("Redirecionando para:", redirectUrl);
+        
+        // Redirecionar automaticamente
+        window.location.href = redirectUrl;
+      } catch (error) {
+        console.error("Erro no redirecionamento:", error);
+        document.getElementById('error-message').textContent = "Erro ao processar redirecionamento: " + (error.message || "Erro desconhecido");
+        document.getElementById('error-container').style.display = 'block';
+        document.getElementById('loading-container').style.display = 'none';
+      }
+    `;
+    
+    // Adicionar script ao corpo do documento
+    document.body.appendChild(script);
+    
+    // Cleanup
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
+
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-4">
+      {/* Container de carregamento */}
+      <div id="loading-container" className="bg-white p-8 rounded-lg shadow-md max-w-md w-full text-center">
+        <div className="mb-4">
+          <div className="w-16 h-16 border-4 border-t-pink-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin mx-auto"></div>
+        </div>
+        <h1 className="text-2xl font-bold mb-4 text-gray-800">Processando Pagamento</h1>
+        <p className="text-gray-600 mb-2">Estamos preparando seu pagamento...</p>
+        <p className="text-gray-500 text-sm">Você será redirecionado automaticamente.</p>
+      </div>
+      
+      {/* Container de erro (inicialmente oculto) */}
+      <div id="error-container" className="bg-white p-8 rounded-lg shadow-md max-w-md w-full text-center hidden">
+        <div className="mb-4 text-red-500">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <h1 className="text-2xl font-bold mb-4 text-gray-800">Erro no Processamento</h1>
+        <p id="error-message" className="text-gray-600 mb-4">Ocorreu um erro ao processar o pagamento.</p>
+        <button 
+          onClick={() => window.history.back()} 
+          className="px-4 py-2 bg-pink-500 text-white rounded-md hover:bg-pink-600 transition-colors"
+        >
+          Voltar
+        </button>
+      </div>
+    </div>
+  );
+} 
