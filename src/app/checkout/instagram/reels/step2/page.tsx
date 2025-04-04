@@ -16,6 +16,10 @@ import { CouponInput } from '@/components/checkout/CouponInput';
 import axios from 'axios';
 import { ArrowLeft } from 'lucide-react';
 import { Suspense } from 'react';
+import { directRedirectToPaymentService } from '@/lib/payment/redirectToPaymentService';
+
+// Adicionar configuração de exportação para evitar pré-renderização estática
+export const dynamic = 'force-dynamic';
 
 // Importar tipos e funções do arquivo de utilitários
 import { 
@@ -27,6 +31,21 @@ import {
   fetchService,
   prepareTransactionData
 } from '../utils/reelsUtils';
+
+// Função para extrair código da URL
+function extractCodeFromUrl(url?: string): string {
+  if (!url) return '';
+  
+  // Extrair código de URL de reels
+  const reelMatch = url.match(/instagram\.com\/reel\/([^\/\?]+)/);
+  if (reelMatch && reelMatch[1]) return reelMatch[1];
+  
+  // Extrair código de URL de posts
+  const postMatch = url.match(/instagram\.com\/p\/([^\/\?]+)/);
+  if (postMatch && postMatch[1]) return postMatch[1];
+  
+  return '';
+}
 
 function ReelsStep2Content() {
   const router = useRouter();
@@ -320,4 +339,17 @@ function ReelsStep2Content() {
   );
 }
 
-export default ReelsStep2Content;
+export default function ReelsStep2Page() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-pink-500 mx-auto mb-4" />
+          <h2 className="text-xl font-medium text-gray-700">Carregando...</h2>
+        </div>
+      </div>
+    }>
+      <ReelsStep2Content />
+    </Suspense>
+  );
+}
