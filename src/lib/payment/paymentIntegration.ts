@@ -301,21 +301,29 @@ export async function processFullPayment(data: CreatePaymentData): Promise<{ suc
     // Valor final a ser pago
     const finalAmount = paymentResult.amount || data.amount || data.service.preco;
     
-    // Redirecionar para o microserviço de pagamento
-    const redirectResult = redirectToPaymentService({
-      serviceId: data.service.id,
-      serviceName: data.service.name,
-      profileUsername: data.profile.username,
-      amount: finalAmount,
-      customerName: data.customer.name,
-      customerEmail: data.customer.email,
-      customerPhone: data.customer.phone,
-      returnUrl: '/agradecimento'
+    // ALTERAÇÃO IMPORTANTE: Em vez de usar o redirectToPaymentService, vamos redirecionar para nossa
+    // página intermediária que então redirecionará para o microserviço de pagamentos
+    
+    // Construir a URL para a página de redirecionamento
+    const params = new URLSearchParams({
+      service_id: data.service.id,
+      service_name: data.service.name || '',
+      username: data.profile.username,
+      amount: finalAmount.toString(),
+      customer_name: data.customer.name || '',
+      customer_email: data.customer.email || '',
+      customer_phone: data.customer.phone || '',
+      return_url: '/agradecimento'
     });
     
-    if (!redirectResult) {
-      throw new Error('Falha ao redirecionar para o microserviço de pagamento');
-    }
+    // URL completa para a página de redirecionamento
+    const redirectUrl = `/redirecionamento-pagamento?${params.toString()}`;
+    
+    console.log('[PAGAMENTO] Redirecionando para a página intermediária:', redirectUrl);
+    
+    // Redirecionar para a página intermediária
+    // Usamos window.location.href diretamente pois isso é chamado de um evento de clique, não durante a renderização
+    window.location.href = redirectUrl;
     
     return { success: true };
   } catch (error) {
