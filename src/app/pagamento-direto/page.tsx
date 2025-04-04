@@ -36,6 +36,28 @@ function PagamentoDiretoContent() {
         const storedData = localStorage.getItem('checkoutProfileData');
         const parsedData = storedData ? JSON.parse(storedData) : {};
         
+        // Função auxiliar para manipular os elementos do DOM com segurança
+        function showError(message) {
+          // Verificar se os elementos existem antes de manipulá-los
+          const errorMessage = document.getElementById('error-message');
+          const errorContainer = document.getElementById('error-container');
+          const loadingContainer = document.getElementById('loading-container');
+          
+          if (errorMessage) {
+            errorMessage.textContent = message;
+          }
+          
+          if (errorContainer) {
+            errorContainer.style.display = 'block';
+          }
+          
+          if (loadingContainer) {
+            loadingContainer.style.display = 'none';
+          }
+          
+          console.error(message);
+        }
+        
         // 3. Combinar dados da URL e localStorage
         const serviceId = params.get('service_id') || parsedData.serviceId || '';
         const username = params.get('username') || (parsedData.profileData ? parsedData.profileData.username : '');
@@ -129,34 +151,28 @@ function PagamentoDiretoContent() {
         // Converter para JSON e codificar
         const jsonData = JSON.stringify(paymentData);
         
-        // Codificar em base64
-        const base64Data = btoa(encodeURIComponent(jsonData));
+        // Criar um ID simplificado para o pedido usando o timestamp + primeiros 6 caracteres do username
+        const timestamp = Date.now().toString(36); // timestamp como base 36
+        const userFragment = (username || 'user').substring(0, 6).toLowerCase();
+        const orderId = \`\${timestamp}-\${userFragment}\`;
+        
+        // Armazenar o payload completo no localStorage com esse ID
+        localStorage.setItem(\`payment_data_\${orderId}\`, jsonData);
         
         // URL do microserviço - usar a variável global definida pelo React
         const microserviceUrl = window.__PAYMENT_SERVICE_URL;
         
-        // URL final para redirecionamento
-        const redirectUrl = microserviceUrl + '/pagamento/pix#' + base64Data;
+        // URL final para redirecionamento - muito mais simples e curta
+        const redirectUrl = \`\${microserviceUrl}/pagamento/pix?orderId=\${orderId}\`;
         
         console.log("Redirecionando para:", redirectUrl);
-        
-        // Verificar se a URL não está muito longa (pode causar problemas)
-        if (redirectUrl.length > 2000) {
-          console.warn("AVISO: URL muito longa pode causar problemas:", redirectUrl.length);
-          document.getElementById('error-message').textContent = 
-            "A URL de redirecionamento é muito longa. Por favor, selecione menos posts ou contate o suporte.";
-          document.getElementById('error-container').style.display = 'block';
-          document.getElementById('loading-container').style.display = 'none';
-          return;
-        }
+        console.log("ID do pedido:", orderId);
         
         // Redirecionar automaticamente
         window.location.href = redirectUrl;
       } catch (error) {
         console.error("Erro no redirecionamento:", error);
-        document.getElementById('error-message').textContent = "Erro ao processar redirecionamento: " + (error.message || "Erro desconhecido");
-        document.getElementById('error-container').style.display = 'block';
-        document.getElementById('loading-container').style.display = 'none';
+        showError("Erro ao processar redirecionamento: " + (error.message || "Erro desconhecido"));
       }
     `;
     
@@ -167,7 +183,7 @@ function PagamentoDiretoContent() {
     return () => {
       document.body.removeChild(script);
       // Limpar a variável global de forma segura
-      window.__PAYMENT_SERVICE_URL = undefined;
+      window.__PAYMENT_SERVICE_URL = '';
     };
   }, [paymentServiceUrl]);
 
