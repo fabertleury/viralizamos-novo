@@ -93,18 +93,34 @@ function PagamentoDiretoContent() {
           
           // Adicionar todos os posts e reels selecionados
           posts: [
-            ...selectedPosts.map(post => ({
-              id: post.id,
-              code: post.code || post.shortcode,
-              type: 'post',
-              url: post.code ? 'https://instagram.com/p/' + post.code : ''
-            })),
-            ...selectedReels.map(reel => ({
-              id: reel.id,
-              code: reel.code || reel.shortcode,
-              type: 'reel',
-              url: reel.code ? 'https://instagram.com/reel/' + reel.code : ''
-            }))
+            ...selectedPosts.map(post => {
+              // Garantir que temos valores de string para cada campo
+              const postId = typeof post.id === 'undefined' ? '' : 
+                              (typeof post.id === 'string' ? post.id.substring(0, 20) : post.id.toString().substring(0, 20));
+              const postCode = typeof post.code === 'string' ? post.code : 
+                              (typeof post.shortcode === 'string' ? post.shortcode : '');
+              
+              return {
+                id: postCode || postId,
+                code: postCode,
+                type: 'post',
+                url: postCode ? 'https://instagram.com/p/' + postCode : ''
+              };
+            }),
+            ...selectedReels.map(reel => {
+              // Garantir que temos valores de string para cada campo
+              const reelId = typeof reel.id === 'undefined' ? '' : 
+                              (typeof reel.id === 'string' ? reel.id.substring(0, 20) : reel.id.toString().substring(0, 20));
+              const reelCode = typeof reel.code === 'string' ? reel.code : 
+                              (typeof reel.shortcode === 'string' ? reel.shortcode : '');
+              
+              return {
+                id: reelCode || reelId,
+                code: reelCode,
+                type: 'reel',
+                url: reelCode ? 'https://instagram.com/reel/' + reelCode : ''
+              };
+            })
           ]
         };
         
