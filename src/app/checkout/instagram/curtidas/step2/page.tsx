@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import PostSelector from '@/components/instagram/curtidas/PostSelector';
@@ -10,9 +10,10 @@ import { Header } from '@/components/layout/header';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, BookCheck, Film, Image } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getProxiedImageUrl } from '../../utils/proxy-image';
-import { PaymentPixModal } from '@/components/payment/PaymentPixModal';
+import PaymentPixModal, { PaymentService } from '@/components/payment/PaymentPixModal';
 import { CouponInput } from '@/components/checkout/CouponInput';
 import axios from 'axios';
 import { useInstagramAPI } from '@/hooks/useInstagramAPI';
@@ -809,14 +810,27 @@ export default function Step2Page() {
         throw new Error('Dados de pagamento incompletos');
       }
 
+      // Armazenar os dados para enviar ao admin depois do redirecionamento
       setPaymentData({
         qrCodeText: paymentResponse.qr_code,
         paymentId: paymentResponse.id,
         amount: service.preco,
         qrCodeBase64: paymentResponse.qr_code_base64
       });
-
+      
+      // Permitir o envio da transação para o admin
       await sendTransactionToAdmin();
+
+      // Redirecionar diretamente via PaymentService
+      await directRedirectToPaymentService({
+        serviceId: service.id,
+        profileUsername: profileData.username,
+        amount: finalAmount || service.preco,
+        customerEmail: formData.email,
+        customerName: formData.name,
+        serviceName: service.name,
+        returnUrl: "/agradecimento"
+      });
     } catch (error) {
       console.error('Error creating payment:', error);
       toast.error('Erro ao criar pagamento. Por favor, tente novamente.');
@@ -1149,22 +1163,33 @@ export default function Step2Page() {
           </div>
         )}
       </main>
-
-      {paymentData ? (
-        <div className="mt-6">
-          <PaymentPixModal
-            isOpen={!!paymentData}
-            onClose={() => setPaymentData(null)}
-            serviceId={service?.id || ''}
-            profileData={{ username: profileData?.username || '' }}
-            amount={paymentData.amount}
-            customerEmail={formData.email}
-            customerName={formData.name}
-            serviceName={service?.name || 'Serviço Viralizamos'}
-            returnUrl="/agradecimento"
-          />
-        </div>
-      ) : null}
     </div>
   );
+}
+
+async function directRedirectToPaymentService(data: {
+  serviceId: string,
+  profileUsername: string,
+  amount: number,
+  customerEmail?: string,
+  customerName?: string,
+  serviceName?: string,
+  returnUrl?: string
+}) {
+  console.log('Redirecionando para serviço de pagamento:', data);
+  
+  // Usar setTimeout para garantir que o redirecionamento ocorra após a renderização do React
+  setTimeout(() => {
+    try {
+      // Redirecionar usando o PaymentService
+      const sucesso = PaymentService.redirecionarParaPagamentoPixNoMicroservico(data);
+      
+      if (!sucesso) {
+        console.error('Falha no redirecionamento para pagamento');
+        // Poderia mostrar um toast aqui, mas não funciona após redirecionamento
+      }
+    } catch (error) {
+      console.error('Erro ao redirecionar para pagamento:', error);
+    }
+  }, 100);
 }
