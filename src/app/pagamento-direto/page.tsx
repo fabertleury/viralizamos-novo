@@ -140,7 +140,11 @@ function PagamentoDiretoContent() {
           
           // Remover o iframe após alguns segundos
           setTimeout(() => {
-            document.body.removeChild(iframe);
+            try {
+              document.body.removeChild(iframe);
+            } catch (e) {
+              // Ignorar erro se o iframe já foi removido
+            }
           }, 3000);
         } catch (syncError) {
           console.warn("Não foi possível sincronizar os dados via iframe: ", syncError);

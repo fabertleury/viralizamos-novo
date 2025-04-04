@@ -1,6 +1,9 @@
 'use client';
 
-interface PaymentData {
+/**
+ * Interface para dados de pagamento
+ */
+export interface PaymentData {
   serviceId: string;
   profileUsername: string;
   amount: number;
@@ -122,7 +125,16 @@ export const PaymentService = {
   }
 };
 
-// Para compatibilidade com a interface atual
-export default function PaymentPixModal() {
+/**
+ * Componente vazio para compatibilidade com a interface atual
+ * @deprecated Usar PaymentService diretamente
+ */
+function PaymentPixModal() {
   return null;
 }
+
+// Exportar o componente como default para compatibilidade com importações existentes
+export default PaymentPixModal;
+
+// Exportar o componente também como named export para compatibilidade com outras importações
+export { PaymentPixModal };
