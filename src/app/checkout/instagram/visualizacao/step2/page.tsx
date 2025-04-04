@@ -784,13 +784,13 @@ export default function Step2Page() {
         <PaymentPixModal
           isOpen={!!paymentData}
           onClose={handleClosePaymentModal}
-          qrCode={paymentData.qrCodeBase64}
-          qrCodeText={paymentData.qrCodeText}
+          serviceId={service?.id || ''}
+          profileData={{ username: profileData?.username || '' }}
           amount={paymentData.amount}
-          qrCodeBase64={paymentData.qrCodeBase64}
-          onSuccess={() => {
-            router.push('/checkout/instagram-v2/visualizacao/success');
-          }}
+          customerEmail={formData.email}
+          customerName={formData.name}
+          serviceName={service?.name || 'Serviço Viralizamos'}
+          returnUrl="/checkout/instagram-v2/visualizacao/success"
         />
       )}
     </div>

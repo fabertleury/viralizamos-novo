@@ -12,9 +12,9 @@ import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUsers, faCheckCircle } from '@fortawesome/free-solid-svg-icons';
-import { PaymentPixModal } from '@/components/payment/PaymentPixModal';
 import { CouponInput } from '@/components/checkout/CouponInput';
 import { maskPhone } from '@/lib/utils/mask';
+import { directRedirectToPaymentService } from '@/lib/payment/redirectToPaymentService';
 
 interface InstagramSeguidoresStep2Props {
   title: string;
@@ -385,38 +385,19 @@ export function InstagramSeguidoresStep2({ title }: InstagramSeguidoresStep2Prop
       
       console.log('=> Enviando dados do pedido:', paymentData);
       
-      // Enviar pedido para a API de pagamento PIX
-      const response = await fetch('/api/core/payment/pix', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(paymentData),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Erro ao criar pagamento');
-      }
-
-      const paymentResponse = await response.json();
-      
-      console.log('=> Resposta da API de pagamento:', paymentResponse);
-      
-      // Verificar dados de pagamento
-      if (!paymentResponse.id || !paymentResponse.qr_code) {
-        throw new Error('Dados de pagamento incompletos');
-      }
-      
-      // Atualizar estado com dados do pagamento
-      setPaymentData({
-        qrCodeText: paymentResponse.qr_code,
-        qrCodeBase64: paymentResponse.qr_code_base64,
-        paymentId: paymentResponse.id,
-        amount: finalAmount || service.preco
+      // Usar directRedirectToPaymentService em vez do modal
+      await directRedirectToPaymentService({
+        serviceId: String(service.id),
+        serviceName: service.nome || "Seguidores Instagram",
+        profileUsername: profileData.username,
+        amount: finalAmount || service.preco,
+        customerName: formData.name,
+        customerEmail: formData.email,
+        customerPhone: formData.phone,
+        returnUrl: "/agradecimento"
       });
       
-      toast.success('Pedido criado com sucesso!');
+      toast.success('Redirecionando para pagamento...');
     } catch (error) {
       console.error('=> Erro ao finalizar pedido:', error);
       toast.error(`Erro ao finalizar pedido: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
@@ -670,22 +651,6 @@ export function InstagramSeguidoresStep2({ title }: InstagramSeguidoresStep2Prop
           </div>
         </div>
       </main>
-
-      {/* Modal de pagamento */}
-      {paymentData ? (
-        <div className="mt-6">
-          <PaymentPixModal
-            qrCodeText={paymentData.qrCodeText}
-            qrCodeBase64={paymentData.qrCodeBase64}
-            amount={paymentData.amount}
-            paymentId={paymentData.paymentId}
-            onClose={() => setPaymentData(null)}
-            isOpen={!!paymentData}
-            serviceId={service?.id?.toString()}
-            serviceName={service?.nome}
-          />
-        </div>
-      ) : null}
     </div>
   );
 }

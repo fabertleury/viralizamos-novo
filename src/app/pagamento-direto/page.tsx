@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 
 /**
@@ -10,7 +10,7 @@ import { useSearchParams } from 'next/navigation';
  * Esta abordagem remove completamente qualquer dependência do React,
  * garantindo que não haja problemas com o ciclo de renderização.
  */
-export default function PagamentoDireto() {
+function PagamentoDiretoContent() {
   const searchParams = useSearchParams();
   
   // Definir a URL do serviço de pagamento para uso no script
@@ -53,6 +53,28 @@ export default function PagamentoDireto() {
         // 6. Outras informações importantes
         const serviceName = params.get('service_name') || parsedData.serviceName || '';
         const quantity = params.get('quantity') || parsedData.quantity || '0';
+        
+        // 7. Log detalhado para debugging
+        console.log("Dados recuperados:", {
+          url: {
+            serviceId: params.get('service_id'),
+            username: params.get('username'),
+            amount: params.get('amount'),
+            customerName: params.get('customer_name'),
+            customerEmail: params.get('customer_email'),
+            serviceName: params.get('service_name')
+          },
+          localStorage: {
+            serviceId: parsedData.serviceId,
+            username: parsedData.profileData?.username,
+            amount: parsedData.amount,
+            customerName: parsedData.name,
+            customerEmail: parsedData.email,
+            serviceName: parsedData.serviceName
+          },
+          selectedPosts: selectedPosts.length,
+          selectedReels: selectedReels.length
+        });
         
         // Construir objeto completo de dados
         const paymentData = {
@@ -149,6 +171,25 @@ export default function PagamentoDireto() {
         </button>
       </div>
     </div>
+  );
+}
+
+// Componente principal com Suspense boundary
+export default function PagamentoDireto() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-4">
+        <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full text-center">
+          <div className="mb-4">
+            <div className="w-16 h-16 border-4 border-t-pink-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin mx-auto"></div>
+          </div>
+          <h1 className="text-2xl font-bold mb-4 text-gray-800">Carregando</h1>
+          <p className="text-gray-500 text-sm">Aguarde um momento...</p>
+        </div>
+      </div>
+    }>
+      <PagamentoDiretoContent />
+    </Suspense>
   );
 }
 

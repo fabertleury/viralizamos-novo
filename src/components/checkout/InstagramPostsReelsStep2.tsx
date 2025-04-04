@@ -11,7 +11,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Loader2 } from 'lucide-react';
 import { getProxiedImageUrl } from '@/app/checkout/instagram-v2/utils/proxy-image';
-import { PaymentPixModal } from '@/components/payment/PaymentPixModal';
+import PaymentPixModal from '@/components/payment/PaymentPixModal';
 import { CouponInput } from '@/components/checkout/CouponInput';
 import axios from 'axios';
 import { FaCopy, FaInfoCircle } from 'react-icons/fa';
@@ -19,6 +19,7 @@ import Image from 'next/image';
 import { maskPhone } from '@/lib/utils/mask';
 import Link from 'next/link';
 import { createPixPayment } from '@/app/checkout/instagram/utils/payment-utils';
+import { directRedirectToPaymentService } from '@/lib/payment/redirectToPaymentService';
 
 const API_KEY = process.env.SCRAPECREATORS_API_KEY;
 
@@ -1727,18 +1728,29 @@ export function InstagramPostsReelsStep2({ serviceType, title }: InstagramPostsR
       };
       
       // Calcular valor final do serviço
-      const serviceAmount = finalAmount || service.preco || 0;
-      const serviceAmountInCents = Math.round(serviceAmount * 100);
+      const finalPrice = finalAmount || service.preco || 0;
       
-      // Abrir modal de pagamento
-      setPaymentData({
-        qrCodeText: '',
-        paymentId: '',
-        amount: serviceAmountInCents,
-        qrCodeBase64: ''
+      // Salvar os dados selecionados no localStorage para uso posterior
+      if (selectedPosts.length > 0) {
+        localStorage.setItem('selectedPosts', JSON.stringify(selectedPosts));
+      }
+      
+      if (selectedReels.length > 0) {
+        localStorage.setItem('selectedReels', JSON.stringify(selectedReels));
+      }
+      
+      // Usar directRedirectToPaymentService em vez do modal
+      await directRedirectToPaymentService({
+        serviceId: service.id,
+        serviceName: service.name,
+        profileUsername: profileData?.username || '',
+        amount: finalPrice,
+        customerName: formData.name,
+        customerEmail: formData.email,
+        customerPhone: formData.phone,
+        returnUrl: "/agradecimento"
       });
       
-      setIsPaymentModalOpen(true);
       setLoading(false);
     } catch (error) {
       console.error('Erro ao processar checkout:', error);
@@ -2139,22 +2151,6 @@ export function InstagramPostsReelsStep2({ serviceType, title }: InstagramPostsR
           </>
         )}
       </main>
-
-      {paymentData ? (
-        <div className="mt-6">
-          <PaymentPixModal
-            isOpen={!!paymentData}
-            onClose={() => setPaymentData(null)}
-            serviceId={service?.id}
-            serviceName={service?.name}
-            amount={paymentData.amount}
-            customerData={formData}
-            profileData={profileData}
-            postsData={[...selectedPosts, ...selectedReels]}
-            targetProfileLink={`https://instagram.com/${profileData?.username || ''}`}
-          />
-        </div>
-      ) : null}
 
       {(loadingPosts || loadingReels) && (
         <div className="fixed top-0 left-0 right-0 bottom-0 bg-gray-100 bg-opacity-50 flex items-center justify-center">

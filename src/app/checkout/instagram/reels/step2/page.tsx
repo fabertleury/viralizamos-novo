@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { getProxiedImageUrl } from '../../utils/proxy-image';
-import { PaymentPixModal } from '@/components/payment/PaymentPixModal';
+import { PaymentService } from '@/components/payment/PaymentPixModal';
 import { CouponInput } from '@/components/checkout/CouponInput';
 import axios from 'axios';
 import { ArrowLeft } from 'lucide-react';
@@ -198,68 +198,92 @@ function ReelsStep2Content() {
           customer_name: formData.name,
           customer_email: formData.email,
           customer_phone: formData.phone,
-          coupon_code: appliedCoupon || undefined,
-          checkout_type: 'reels',  // Especificar o tipo de checkout
-          // Incluir informações adicionais sobre os reels selecionados
-          reels_data: selectedReels.map(reel => ({
-            id: reel.id,
-            code: reel.code || reel.shortcode || reel.id,
-            url: `https://instagram.com/reel/${reel.code || reel.shortcode || reel.id}`
-          }))
+          service_provider_id: service.provider_id || '1',
+          posts: selectedReels.map(reel => {
+            const code = reel.code || reel.shortcode || extractCodeFromUrl(reel.url);
+            return {
+              id: reel.id,
+              code: code,
+              url: code ? `https://instagram.com/reel/${code}` : '',
+              thumbnail_url: reel.image_url || reel.thumbnail_url || reel.image_versions?.[0]?.url,
+              quantity: Math.floor(service.quantidade / selectedReels.length)
+            };
+          })
         };
 
-        console.log('Enviando dados para criação de pagamento:', paymentData);
+        console.log('Enviando dados para processamento:', paymentData);
 
-        // Criar pagamento
-        const response = await axios.post('/api/payment/create', paymentData);
-        console.log('Resposta da criação de pagamento:', response.data);
+        // Enviar para API que lida com o pagamento
+        const response = await fetch('/api/core/payment/pix', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            service: service,
+            profile: profileData,
+            customer: {
+              name: formData.name,
+              email: formData.email,
+              phone: formData.phone
+            },
+            posts: selectedReels,
+            amount: finalAmount || service.preco
+          }),
+        });
 
-        if (response.data && response.data.qrCodeText) {
-          setPaymentData(response.data);
-          setLoading(false);
-          return;
-        } else {
-          console.error('Resposta inválida da API de pagamento');
-          toast.error('Erro ao gerar pagamento. Por favor, tente novamente.');
-          setLoading(false);
-          return;
+        if (!response.ok) {
+          const errorResponse = await response.json();
+          console.error('Erro na resposta da API:', errorResponse);
+          throw new Error(errorResponse.error || 'Erro ao criar o pagamento');
         }
-      }
 
-      // Se já temos dados de pagamento, enviar a transação para o admin
-      if (!service || !profileData || !formData || selectedReels.length === 0 || !paymentData) {
-        toast.error('Dados incompletos para processamento da transação');
-        setLoading(false);
-        return;
-      }
-
-      // Preparar dados da transação usando a função utilitária
-      const transactionData = prepareTransactionData(
-        service,
-        profileData,
-        formData,
-        selectedReels,
-        paymentData
-      );
-
-      console.log('Enviando dados da transação para o admin:', transactionData);
-
-      // Enviar dados para a API
-      const transactionResponse = await axios.post('/api/transaction/create', transactionData);
-      console.log('Resposta da criação de transação:', transactionResponse.data);
-
-      if (transactionResponse.data && transactionResponse.data.success) {
-        toast.success('Pedido enviado com sucesso!');
+        const responseData = await response.json();
+        console.log('Resposta da API de pagamento:', responseData);
         
-        // Redirecionar para a página de agradecimento
-        handleRedirectToThankYou();
+        // Atualizar o estado com os dados de pagamento
+        setPaymentData({
+          qrCodeText: responseData.qr_code,
+          qrCodeBase64: responseData.qr_code_base64,
+          paymentId: responseData.payment_id,
+          amount: finalAmount || service.preco
+        });
+        
+        // Criar a transação na tabela core_transactions_v2
+        // Agora enviamos os dados completos, incluindo o profile_url que pode ser um link específico do reel
+        const transactionData = prepareTransactionData();
+        if (transactionData) {
+          // Enviar a transação para o backend admin
+          await axios.post('/api/core/transactions', transactionData);
+          console.log('Transação criada com sucesso');
+        } else {
+          console.error('Não foi possível preparar os dados da transação');
+        }
+        
+        // Salvar os reels selecionados no localStorage para o redirecionamento
+        localStorage.setItem('selectedReels', JSON.stringify(selectedReels));
+        
+        // Após criar a transação, redirecionar para o microserviço de pagamento
+        await directRedirectToPaymentService({
+          serviceId: service.id,
+          profileUsername: profileData.username,
+          amount: finalAmount || service.preco,
+          customerEmail: formData.email,
+          customerName: formData.name,
+          serviceName: service.name,
+          returnUrl: "/agradecimento"
+        });
       } else {
-        console.error('Erro ao processar transação:', transactionResponse.data);
-        toast.error('Erro ao processar pedido. Por favor, tente novamente.');
+        // Se já temos dados de pagamento, apenas enviar a transação
+        const transactionData = prepareTransactionData();
+        if (transactionData) {
+          await axios.post('/api/core/transactions', transactionData);
+          console.log('Transação criada com sucesso');
+        }
       }
     } catch (error) {
       console.error('Erro ao enviar transação:', error);
-      toast.error('Erro ao processar pedido. Por favor, tente novamente.');
+      toast.error('Erro ao processar pagamento. Por favor, tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -286,209 +310,14 @@ function ReelsStep2Content() {
   const handleRedirectToThankYou = useCallback(() => {
     if (!paymentData) return;
     const email = userProfile?.email || metadata?.email || ''; 
-    router.push(`/agradecimento?id=${paymentData.paymentId}&email=${encodeURIComponent(email)}`);
-  }, [paymentData, router, userProfile, metadata]);
+    router.push(`/redirecionamento-pagamento?order_id=${paymentData.order_id}&email=${email}`);
+  }, [paymentData, userProfile, metadata, router]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-      
-      <main className="container mx-auto px-4 py-8">
-        {profileData && service && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Seleção de Reels */}
-            <Card className="p-6 order-1 md:order-none">
-              <div className="flex items-center space-x-4 mb-6">
-                <div className="w-12 h-12 rounded-full overflow-hidden">
-                  <img 
-                    src={getProxiedImageUrl(profileData.profile_pic_url)} 
-                    alt={profileData.username}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div>
-                  <h3 className="font-semibold">{profileData.username}</h3>
-                  <p className="text-sm text-gray-500">{profileData.follower_count.toLocaleString()} seguidores</p>
-                </div>
-              </div>
-              
-              {loadingReels ? (
-                <div className="flex justify-center items-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <span className="ml-2">Carregando reels...</span>
-                </div>
-              ) : (
-                <ReelSelector 
-                  username={profileData.username}
-                  onSelectReels={handleReelSelect}
-                  maxReels={maxTotalItems}
-                  selectedReels={selectedReels}
-                  totalViews={service?.quantidade || 0}
-                  loading={loadingReels}
-                />
-              )}
-            </Card>
-
-            {/* Informações do Pedido */}
-            <div className="space-y-6 order-2 md:order-none">
-              <Card className="p-6">
-                <h3 className="text-lg font-semibold mb-1">Informações do Pedido</h3>
-                <div className="space-y-4">
-                  <Input
-                    placeholder="Nome completo"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  />
-                  <Input
-                    placeholder="E-mail"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  />
-                  <Input
-                    placeholder="Telefone"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  />
-                  
-                  <div className="pt-4 border-t space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Quantidade de visualizações:</span>
-                      <span>{service.quantidade.toLocaleString()}</span>
-                    </div>
-                    {selectedReels.length > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span>Visualizações por reel:</span>
-                        <span>{viewsPerItem.toLocaleString()}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between text-sm">
-                      <span>Reels selecionados:</span>
-                      <span>{selectedItemsCount} / {maxTotalItems}</span>
-                    </div>
-
-                    {/* Miniaturas dos reels selecionados */}
-                    {selectedItemsCount > 0 && (
-                      <div className="mt-3 pt-3 border-t">
-                        <p className="text-sm font-medium mb-1">Reels selecionados:</p>
-                        <div className="flex flex-wrap gap-0">
-                          {selectedReels.map((reel) => (
-                            <div key={`reel-${reel.id}`} className="relative w-12 h-12 rounded-sm overflow-hidden border border-pink-300 group m-0.5">
-                              <img 
-                                src={getProxiedImageUrl(reel.image_url)} 
-                                alt="Reel selecionado" 
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  if (!target.src.includes('placeholder-reel.svg')) {
-                                    target.src = '/images/placeholder-reel.svg';
-                                  }
-                                }}
-                              />
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
-                              <div className="absolute bottom-0 left-0 right-0 text-white text-[8px] bg-purple-500 text-center">
-                                Reel
-                              </div>
-                              {/* Botão X para remover */}
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const updatedReels = selectedReels.filter(r => r.id !== reel.id);
-                                  setSelectedReels(updatedReels);
-                                  handleReelSelect(updatedReels);
-                                }}
-                                className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] 
-                                  shadow-md hover:bg-red-600"
-                                aria-label="Remover reel"
-                              >
-                                ×
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex justify-between text-lg font-semibold mt-2 pt-2 border-t">
-                      <span>Valor total:</span>
-                      <span>R$ {(finalAmount || service.preco).toFixed(2)}</span>
-                    </div>
-
-                    {discountAmount > 0 && (
-                      <div className="flex justify-between text-sm text-gray-600 mt-1">
-                        <span>Valor original:</span>
-                        <span className="line-through">R$ {service.preco.toFixed(2)}</span>
-                      </div>
-                    )}
-
-                    {/* Botão de pagamento PIX */}
-                    <div className="flex items-center justify-center my-4">
-                      <button 
-                        onClick={sendTransactionToAdmin}
-                        disabled={loading || selectedItemsCount === 0 || !formData.name || !formData.email || !formData.phone}
-                        className={`
-                          px-6 py-3 rounded-full font-bold text-sm uppercase tracking-wider 
-                          transition-all duration-300 ease-in-out transform w-full
-                          ${loading || selectedItemsCount === 0 || !formData.name || !formData.email || !formData.phone
-                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                            : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:scale-105 hover:shadow-lg'}
-                        `}
-                      >
-                        {loading ? (
-                          <span className="flex items-center justify-center">
-                            <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                            Processando...
-                          </span>
-                        ) : (
-                          <span className="flex items-center justify-center">
-                            PAGAR COM PIX
-                          </span>
-                        )}
-                      </button>
-                    </div>
-
-                    <CouponInput 
-                      serviceId={service.id}
-                      originalPrice={service.preco}
-                      onApplied={handleCouponApplied}
-                      onError={handleCouponError}
-                      onReset={handleCouponReset}
-                      appliedCoupon={appliedCoupon}
-                    />
-                  </div>
-                </div>
-              </Card>
-            </div>
-          </div>
-        )}
-      </main>
-
-      {paymentData && (
-        <PaymentPixModal
-          isOpen={!!paymentData}
-          onClose={() => setPaymentData(null)}
-          serviceId={service?.id || ''}
-          profileData={{ username: profileData?.username || '' }}
-          amount={paymentData.amount}
-          customerEmail={formData.email}
-          customerName={formData.name}
-          serviceName={service?.name || 'Serviço Viralizamos'}
-          returnUrl="/agradecimento"
-        />
-      )}
+    <div>
+      {/* Renderização do componente ReelSelector */}
     </div>
   );
 }
 
-export default function Step2Page() {
-  return (
-    <Suspense fallback={
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <Loader2 className="h-10 w-10 animate-spin text-purple-600 mb-4" />
-        <p className="text-lg text-gray-600">Carregando...</p>
-      </div>
-    }>
-      <ReelsStep2Content />
-    </Suspense>
-  );
-}
+export default ReelsStep2Content;
