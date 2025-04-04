@@ -21,13 +21,10 @@ function PagamentoDiretoContent() {
 
   useEffect(() => {
     // Adicionar a URL do serviço de pagamento como variável global
-    // para evitar problemas de interpolação no script
     window.__PAYMENT_SERVICE_URL = paymentServiceUrl;
     
-    // Script de redirecionamento executado uma única vez após a montagem do componente
-    const script = document.createElement('script');
-    script.innerHTML = `
-      // Recuperar todos os dados necessários
+    // Função para processar o redirecionamento
+    const processRedirection = () => {
       try {
         // 1. Verificar dados da URL
         const params = new URLSearchParams(window.location.search);
@@ -35,28 +32,6 @@ function PagamentoDiretoContent() {
         // 2. Ou recuperar do localStorage se não estiver na URL
         const storedData = localStorage.getItem('checkoutProfileData');
         const parsedData = storedData ? JSON.parse(storedData) : {};
-        
-        // Função auxiliar para manipular os elementos do DOM com segurança
-        function showError(message) {
-          // Verificar se os elementos existem antes de manipulá-los
-          const errorMessage = document.getElementById('error-message');
-          const errorContainer = document.getElementById('error-container');
-          const loadingContainer = document.getElementById('loading-container');
-          
-          if (errorMessage) {
-            errorMessage.textContent = message;
-          }
-          
-          if (errorContainer) {
-            errorContainer.style.display = 'block';
-          }
-          
-          if (loadingContainer) {
-            loadingContainer.style.display = 'none';
-          }
-          
-          console.error(message);
-        }
         
         // 3. Combinar dados da URL e localStorage
         const serviceId = params.get('service_id') || parsedData.serviceId || '';
@@ -79,7 +54,7 @@ function PagamentoDiretoContent() {
         const serviceName = params.get('service_name') || parsedData.serviceName || '';
         const quantity = params.get('quantity') || parsedData.quantity || '0';
         
-        // 7. Log detalhado para debugging
+        // Log detalhado para debugging
         console.log("Dados recuperados:", {
           url: {
             serviceId: params.get('service_id'),
@@ -148,22 +123,19 @@ function PagamentoDiretoContent() {
         
         console.log("Dados de pagamento completos:", paymentData);
         
-        // Converter para JSON e codificar
+        // Converter para JSON
         const jsonData = JSON.stringify(paymentData);
         
-        // Criar um ID simplificado para o pedido usando o timestamp + primeiros 6 caracteres do username
-        const timestamp = Date.now().toString(36); // timestamp como base 36
-        const userFragment = (username || 'user').substring(0, 6).toLowerCase();
-        const orderId = \`\${timestamp}-\${userFragment}\`;
+        // Criar um ID simplificado para o pedido usando apenas o ID do serviço
+        // Sem usar informações sensíveis ou caracteres especiais
+        const timestamp = Date.now().toString(36);
+        const orderId = `${timestamp}-${serviceId.substring(0, 8)}`;
         
         // Armazenar o payload completo no localStorage com esse ID
-        localStorage.setItem(\`payment_data_\${orderId}\`, jsonData);
+        localStorage.setItem(`payment_data_${orderId}`, jsonData);
         
-        // URL do microserviço - usar a variável global definida pelo React
-        const microserviceUrl = window.__PAYMENT_SERVICE_URL;
-        
-        // URL final para redirecionamento - muito mais simples e curta
-        const redirectUrl = \`\${microserviceUrl}/pagamento/pix?orderId=\${orderId}\`;
+        // URL final para redirecionamento - usando apenas o orderId
+        const redirectUrl = `${paymentServiceUrl}/pagamento/pix?oid=${orderId}`;
         
         console.log("Redirecionando para:", redirectUrl);
         console.log("ID do pedido:", orderId);
@@ -171,17 +143,31 @@ function PagamentoDiretoContent() {
         // Redirecionar automaticamente
         window.location.href = redirectUrl;
       } catch (error) {
+        // Mostrar erro na UI
+        const errorMessage = document.getElementById('error-message');
+        const errorContainer = document.getElementById('error-container');
+        const loadingContainer = document.getElementById('loading-container');
+        
+        if (errorMessage) {
+          errorMessage.textContent = "Erro ao processar redirecionamento: " + (error.message || "Erro desconhecido");
+        }
+        
+        if (errorContainer) {
+          errorContainer.style.display = 'block';
+        }
+        
+        if (loadingContainer) {
+          loadingContainer.style.display = 'none';
+        }
+        
         console.error("Erro no redirecionamento:", error);
-        showError("Erro ao processar redirecionamento: " + (error.message || "Erro desconhecido"));
       }
-    `;
+    };
     
-    // Adicionar script ao corpo do documento
-    document.body.appendChild(script);
+    // Executar o processamento após um pequeno delay para garantir que o DOM esteja pronto
+    setTimeout(processRedirection, 100);
     
-    // Cleanup
     return () => {
-      document.body.removeChild(script);
       // Limpar a variável global de forma segura
       window.__PAYMENT_SERVICE_URL = '';
     };
