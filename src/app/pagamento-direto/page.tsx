@@ -3,6 +3,9 @@
 import { useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 
+// Configuração para evitar pré-renderização estática
+export const dynamic = 'force-dynamic';
+
 /**
  * Página simples que redireciona diretamente para o microserviço de pagamento
  * enviando todos os dados necessários.

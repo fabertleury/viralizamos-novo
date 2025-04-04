@@ -1,15 +1,18 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
+
+// Configuração para evitar pré-renderização estática
+export const dynamic = 'force-dynamic';
 
 /**
  * Página dedicada para redirecionamento para o microserviço de pagamentos
  * Esta abordagem evita completamente conflitos com o ciclo de vida do React
  * em outros componentes, eliminando o Error #130
  */
-export default function RedirecionamentoPagamento() {
+function RedirecionamentoContent() {
   const searchParams = useSearchParams();
   const [erro, setErro] = useState<string | null>(null);
   const [redirecionando, setRedirecionando] = useState(true);
@@ -115,5 +118,26 @@ export default function RedirecionamentoPagamento() {
         )}
       </div>
     </div>
+  );
+}
+
+// Componente principal com Suspense boundary
+export default function RedirecionamentoPagamento() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-r from-purple-600 to-pink-600 p-4 text-white">
+        <div className="bg-white/10 backdrop-blur-md rounded-lg p-8 max-w-md w-full shadow-lg border border-white/20">
+          <div className="flex flex-col items-center justify-center">
+            <Loader2 className="h-12 w-12 animate-spin mb-4 text-white" />
+            <h1 className="text-xl font-bold mb-2 text-center">Carregando...</h1>
+            <p className="text-center text-white/80">
+              Preparando redirecionamento...
+            </p>
+          </div>
+        </div>
+      </div>
+    }>
+      <RedirecionamentoContent />
+    </Suspense>
   );
 } 
