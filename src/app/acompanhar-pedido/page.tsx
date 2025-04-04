@@ -219,165 +219,140 @@ function AcompanharPedidoContent() {
   }, []);
 
   // Função para buscar pedidos sem o evento de formulário
-  const handleSearchOrders = async (emailToSearch: string) => {
-    if (!emailToSearch) return;
+  const handleSearchOrders = async (userEmail?: string) => {
+    const emailToSearch = userEmail || email;
+    
+    if (!emailToSearch) {
+      toast.error('Por favor, informe seu e-mail para buscar os pedidos.');
+      return;
+    }
     
     setLoading(true);
-    setSearched(true);
-    // Limpar os pedidos existentes antes de buscar novos
     setOrders([]);
+    setSearched(true);
     
     try {
+      // Buscar pedidos do banco Supabase
       const supabase = createClientComponentClient();
-
-      // Primeiro tenta buscar pelo campo customer_email diretamente na nova tabela core_transactions_v2
-      const { data: transactionsV2, error: transactionsError } = await supabase
-        .from('core_transactions_v2')
-        .select('id, customer_name, customer_email, payment_status')
-        .eq('customer_email', emailToSearch)
-        .order('created_at', { ascending: false });
-          
-      // Usaremos essa variável para armazenar as transações encontradas
-      let foundTransactions = transactionsV2;
-          
-      if (transactionsError) {
-        console.error('Erro ao buscar transações pelo email na tabela core_transactions_v2:', transactionsError);
-        
-        // Tenta buscar na tabela antiga como fallback
-        console.log('Tentando buscar na tabela antiga como fallback...');
-        const { data: oldTransactions, error: oldTransactionsError } = await supabase
-          .from('core_transactions')
-          .select('id, customer_name, customer_email, payment_status')
-          .eq('customer_email', emailToSearch)
-          .order('created_at', { ascending: false });
-          
-        if (!oldTransactionsError && oldTransactions && oldTransactions.length > 0) {
-          console.log(`Encontradas ${oldTransactions.length} transações na tabela antiga`);
-          foundTransactions = oldTransactions;
-        } else if (oldTransactionsError) {
-          console.error('Erro ao buscar transações na tabela antiga:', oldTransactionsError);
-        }
-      }
-      
-      // Se não encontrou registros, busca nos metadados da nova tabela
-      if (!foundTransactions || foundTransactions.length === 0) {
-        console.log('Email não encontrado em customer_email, buscando nos metadados...');
-        
-        // Tentar buscar pelo email nos metadados da transação na nova tabela
-        const { data: metadataTransactions, error: metadataError } = await supabase
-          .from('core_transactions_v2')
-          .select('id, customer_name, customer_email, payment_status')
-          .or(`metadata->email.eq.${emailToSearch},metadata->contact->email.eq.${emailToSearch}`) // Busca em múltiplos caminhos do metadata
-          .order('created_at', { ascending: false });
-          
-        if (metadataError) {
-          console.error('Erro ao buscar transações pelos metadados na tabela nova:', metadataError);
-          
-          // Tenta buscar nos metadados da tabela antiga
-          const { data: oldMetadataTransactions, error: oldMetadataError } = await supabase
-            .from('core_transactions')
-            .select('id, customer_name, customer_email, payment_status')
-            .or(`metadata->email.eq.${emailToSearch},metadata->contact->email.eq.${emailToSearch}`)
-            .order('created_at', { ascending: false });
-            
-          if (!oldMetadataError && oldMetadataTransactions && oldMetadataTransactions.length > 0) {
-            foundTransactions = oldMetadataTransactions;
-          } else if (oldMetadataError) {
-            console.error('Erro ao buscar transações pelos metadados na tabela antiga:', oldMetadataError);
-          }
-        } else if (metadataTransactions && metadataTransactions.length > 0) {
-          foundTransactions = metadataTransactions;
-        }
-      }
-      
-      // Se ainda não encontrou transações
-      if (!foundTransactions || foundTransactions.length === 0) {
-        toast.info('Nenhuma transação encontrada para este email');
-        setLoading(false);
-        return;
-      }
-          
-      console.log(`Encontradas ${foundTransactions.length} transações para o email ${emailToSearch}`);
-      
-      // Extrair IDs das transações encontradas
-      const transactionIds = foundTransactions.map(t => t.id);
-      
-      // Buscar pedidos pelas transaction_ids
-      const { data: userOrders, error: ordersError } = await supabase
-        .from('core_orders')
+      const { data: ordersData, error } = await supabase
+        .from('orders')
         .select(`
           *,
-          service:service_id (
-            name,
-            type,
-            service_details,
-            provider:provider_id (*)
-          ),
-          provider:provider_id (*)
+          service:service_id (*),
+          transaction:transaction_id (*)
         `)
-        .in('transaction_id', transactionIds)
-        .not('status', 'in', '("skipped","error")') // Excluir pedidos com status 'skipped' ou 'error'
-        .order('created_at', { ascending: false });
-            
-      if (ordersError) {
-        console.error('Erro ao buscar pedidos:', ordersError);
-        toast.error('Erro ao buscar pedidos');
-        setLoading(false);
-        return;
+        .or(`customer_email.eq.${emailToSearch},metadata->customer->email.eq.${emailToSearch}`);
+      
+      if (error) {
+        throw new Error(error.message);
       }
       
-      if (userOrders && userOrders.length > 0) {
-        // Criar um mapa das transações para acesso rápido
-        const transactionsMap: Record<string, Transaction> = foundTransactions.reduce((acc: Record<string, Transaction>, transaction) => {
-          acc[transaction.id] = transaction;
-          return acc;
-        }, {});
-        
-        // Buscar reposições para os pedidos encontrados
-        const orderIds = userOrders.map(order => order.id);
-        
-        const { data: refills, error: refillsError } = await supabase
-          .from('core_refills')
-          .select('*')
-          .in('order_id', orderIds);
-          
-        if (refillsError) {
-          console.error('Erro ao buscar reposições:', refillsError);
-        }
-        
-        // Adicionar as reposições e status de pagamento aos pedidos
-        const ordersWithData = userOrders.map(order => {
-          // Buscar a transação associada
-          const transaction = transactionsMap[order.transaction_id] || {};
-          
-          // Buscar as reposições associadas
-          const orderRefills = refills?.filter(refill => refill.order_id === order.id) || [];
-          
-          return {
-            ...order,
-            refills: orderRefills,
-            payment_status: transaction.payment_status || 'pending'
-          };
+      // Buscar pedidos do microserviço de pagamentos
+      let paymentServiceOrders = [];
+      
+      try {
+        const response = await fetch('/api/payment-service/orders', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email: emailToSearch }),
         });
         
-        setOrders(ordersWithData);
-        console.log(`Processados ${ordersWithData.length} pedidos com ${refills?.length || 0} reposições`);
-      } else {
-        setOrders([]);
+        if (response.ok) {
+          const data = await response.json();
+          
+          if (data.orders && Array.isArray(data.orders)) {
+            console.log('Pedidos do microserviço de pagamentos:', data.orders);
+            
+            // Transformar os pedidos do microserviço no formato esperado pela aplicação
+            paymentServiceOrders = data.orders.map(order => ({
+              id: order.id,
+              external_order_id: order.payment_id,
+              created_at: new Date(order.created_at).toISOString(),
+              updated_at: new Date(order.updated_at || order.created_at).toISOString(),
+              status: mapPaymentStatusToOrderStatus(order.status),
+              customer_email: order.customer_email,
+              customer_name: order.customer_name,
+              payment_id: order.payment_id,
+              payment_method: order.payment_method,
+              service: {
+                id: order.service_id || 'unknown',
+                name: order.service_name || 'Serviço do Viralizamos',
+                type: extractServiceTypeFromName(order.service_name || ''),
+              },
+              metadata: {
+                ...order.metadata,
+                link: order.target_username ? `https://instagram.com/${order.target_username}` : '',
+                payment: order.payment,
+                source: 'payment_service'
+              },
+              quantity: order.quantity || 0,
+              amount: order.amount || 0,
+              from_payment_service: true
+            }));
+          }
+        } else {
+          console.error('Erro ao buscar pedidos do microserviço:', await response.json());
+        }
+      } catch (microserviceError) {
+        console.error('Erro ao buscar pedidos do microserviço:', microserviceError);
+        // Não interromper o fluxo se houver erro no microserviço
       }
       
-      if (!userOrders || userOrders.length === 0) {
-        toast.info('Nenhum pedido encontrado para este email');
+      // Combinar os pedidos
+      const allOrders = [...(ordersData || []), ...paymentServiceOrders];
+      
+      // Ordenar por data de criação (mais recentes primeiro)
+      allOrders.sort((a, b) => {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+      
+      setOrders(allOrders);
+      
+      if (allOrders.length === 0) {
+        toast.info('Nenhum pedido encontrado para este e-mail.', { id: 'no-orders' });
       } else {
-        console.log(`Encontrados ${userOrders.length} pedidos para o email ${emailToSearch}`);
+        toast.success(`${allOrders.length} pedidos encontrados.`, { id: 'orders-found' });
       }
     } catch (error) {
       console.error('Erro ao buscar pedidos:', error);
-      toast.error('Erro ao buscar pedidos');
-      setOrders([]);
+      toast.error('Erro ao buscar pedidos. Por favor, tente novamente mais tarde.');
     } finally {
       setLoading(false);
     }
+  };
+
+  /**
+   * Mapeia o status do pagamento para o status do pedido
+   */
+  const mapPaymentStatusToOrderStatus = (paymentStatus: string): string => {
+    switch (paymentStatus?.toLowerCase()) {
+      case 'approved':
+        return 'processing';
+      case 'pending':
+        return 'awaiting_payment';
+      case 'rejected':
+      case 'cancelled':
+      case 'refunded':
+        return 'cancelled';
+      default:
+        return paymentStatus?.toLowerCase() || 'unknown';
+    }
+  };
+
+  /**
+   * Extrai o tipo de serviço do nome
+   */
+  const extractServiceTypeFromName = (serviceName: string): string => {
+    const lowerName = serviceName.toLowerCase();
+    
+    if (lowerName.includes('seguidor')) return 'followers';
+    if (lowerName.includes('curtida')) return 'likes';
+    if (lowerName.includes('visualização') || lowerName.includes('view')) return 'views';
+    if (lowerName.includes('comentário') || lowerName.includes('comment')) return 'comments';
+    
+    return 'other';
   };
 
   // Função para obter a cor do badge de status
