@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 
 interface PaymentPixModalProps {
   isOpen: boolean;
-  onClose: () => void;
+  onClose?: () => void;
   serviceId: string;
   profileData: {
     username: string;
@@ -79,6 +79,7 @@ function ExpireTimer({ expiresAt }: { expiresAt: Date }) {
 
 export default function PaymentPixModal({
   isOpen,
+  onClose,
   serviceId,
   profileData,
   amount,
@@ -88,15 +89,33 @@ export default function PaymentPixModal({
   returnUrl = 'https://viralizamos.com/agradecimento'
 }: PaymentPixModalProps) {
   const router = useRouter();
+  const [redirecting, setRedirecting] = useState(false);
+  
+  // Only attempt redirect if component is mounted
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
   
   useEffect(() => {
-    // Redirecionar para o serviço de pagamento quando o modal é aberto
-    if (isOpen && serviceId && profileData.username && amount) {
-      redirectToPaymentService();
+    // Only redirect if modal is open, component is mounted, and we're not already redirecting
+    if (mounted && isOpen && serviceId && profileData?.username && amount && !redirecting) {
+      try {
+        setRedirecting(true);
+        redirectToPaymentService();
+      } catch (error) {
+        console.error('Erro ao redirecionar para o serviço de pagamento:', error);
+        setRedirecting(false);
+        // If there's an onClose handler, call it to close the modal on error
+        if (onClose) onClose();
+      }
     }
-  }, [isOpen, serviceId, profileData, amount]);
+  }, [isOpen, serviceId, profileData, amount, mounted, redirecting]);
   
   const redirectToPaymentService = () => {
+    if (typeof window === 'undefined') return; // Guard against server-side execution
+    
     // Criar objeto com dados do pagamento
     const paymentData: PaymentData = {
       amount,
@@ -108,15 +127,23 @@ export default function PaymentPixModal({
       return_url: returnUrl
     };
     
-    // Codificar dados em base64 usando API nativa do browser
-    const jsonString = JSON.stringify(paymentData);
-    const base64Data = btoa(encodeURIComponent(jsonString));
-    
-    // Construir URL para o serviço de pagamento
-    const paymentUrl = `${process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || 'https://pagamentos.viralizamos.com'}/pagamento/pix#${base64Data}`;
-    
-    // Redirecionar para o serviço de pagamento
-    window.location.href = paymentUrl;
+    try {
+      // Codificar dados em base64 usando API nativa do browser
+      const jsonString = JSON.stringify(paymentData);
+      const base64Data = btoa(encodeURIComponent(jsonString));
+      
+      // Construir URL para o serviço de pagamento
+      const paymentUrl = `${process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || 'https://pagamentos.viralizamos.com'}/pagamento/pix#${base64Data}`;
+      
+      // Usar setTimeout para garantir que o redirect aconteça depois de toda a lógica React
+      setTimeout(() => {
+        // Redirecionar para o serviço de pagamento
+        window.location.href = paymentUrl;
+      }, 0);
+    } catch (error) {
+      console.error('Erro ao preparar dados para redirecionamento:', error);
+      throw error;
+    }
   };
   
   // O componente não renderiza nada, apenas redireciona
