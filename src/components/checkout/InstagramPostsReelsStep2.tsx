@@ -20,6 +20,7 @@ import { maskPhone } from '@/lib/utils/mask';
 import Link from 'next/link';
 import { createPixPayment } from '@/app/checkout/instagram/utils/payment-utils';
 import { directRedirectToPaymentService } from '@/lib/payment/redirectToPaymentService';
+import { processCheckoutAndRedirect } from '@/lib/payment/microservice-integration';
 
 const API_KEY = process.env.SCRAPECREATORS_API_KEY;
 
@@ -1701,34 +1702,21 @@ export function InstagramPostsReelsStep2({ serviceType, title }: InstagramPostsR
       
       setLoading(true);
       
-      // Preparar informações de posts/reels selecionados
-      const selectedPostsData = selectedPosts.map(post => ({
-        id: post.id,
-        code: post.code || post.shortcode || post.id,
-        image_url: post.image_url || post.thumbnail_url || post.display_url,
-        like_count: post.like_count || 0,
-        comment_count: post.comment_count || 0,
-        is_reel: false
-      }));
-      
-      const selectedReelsData = selectedReels.map(reel => ({
-        id: reel.id,
-        code: reel.code || reel.shortcode || reel.id,
-        image_url: reel.image_url || reel.thumbnail_url || reel.display_url,
-        view_count: reel.view_count || 0,
-        is_reel: true
-      }));
-      
-      // Preparar dados do perfil
-      const profileInfo = {
-        username: profileData?.username || '',
-        full_name: profileData?.full_name || '',
-        follower_count: profileData?.follower_count || 0,
-        is_private: profileData?.is_private || false
-      };
-      
-      // Calcular valor final do serviço
-      const finalPrice = finalAmount || service.preco || 0;
+      // Preparando os posts selecionados para envio
+      const allSelectedPosts = [
+        ...selectedPosts.map(post => ({
+          id: post.id,
+          code: post.code || post.shortcode || post.id,
+          image_url: post.image_url || post.thumbnail_url || post.display_url,
+          is_reel: false
+        })),
+        ...selectedReels.map(reel => ({
+          id: reel.id,
+          code: reel.code || reel.shortcode || reel.id,
+          image_url: reel.image_url || reel.thumbnail_url || reel.display_url,
+          is_reel: true
+        }))
+      ];
       
       // Salvar os dados selecionados no localStorage para uso posterior
       if (selectedPosts.length > 0) {
@@ -1739,64 +1727,37 @@ export function InstagramPostsReelsStep2({ serviceType, title }: InstagramPostsR
         localStorage.setItem('selectedReels', JSON.stringify(selectedReels));
       }
       
-      // URL do microserviço de pagamento
-      const paymentServiceUrl = process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || 'https://pagamentos.viralizamos.com';
+      // Calcular valor final do serviço
+      const finalPrice = finalAmount || service.preco || 0;
       
-      // Preparar dados para enviar ao microserviço de pagamentos
-      const requestData = {
+      // Utilizando nossa nova função de integração para enviar os dados e redirecionar
+      const success = await processCheckoutAndRedirect({
         amount: finalPrice,
-        service_id: service.id,
-        profile_username: profileData?.username || '',
-        customer_email: formData.email,
-        customer_name: formData.name,
-        customer_phone: formData.phone,
-        service_name: service.name || 'Serviço Viralizamos',
-        return_url: "/agradecimento",
-        additional_data: {
-          posts: [...selectedPostsData, ...selectedReelsData],
+        serviceData: {
+          id: service.id,
+          name: service.name || '',
+          price: finalPrice,
           quantity: service.quantidade || 1,
-          source: 'viralizamos_site_v2',
-          origin: window.location.href,
-          service_type: serviceType,
-          timestamp: new Date().toISOString()
-        }
-      };
-      
-      console.log('Enviando dados para API de solicitação de pagamento:', requestData);
-      
-      // Enviar solicitação para o microserviço de pagamentos
-      const response = await fetch(`${paymentServiceUrl}/api/payment-request`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Payment-Source': 'viralizamos-site-v2',
+          provider_id: service.provider_id
         },
-        body: JSON.stringify(requestData),
+        profileUsername: profileData?.username || '',
+        selectedPosts: allSelectedPosts,
+        customerData: {
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone
+        },
+        serviceType,
+        returnUrl: "/agradecimento"
       });
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Erro na resposta do serviço de pagamentos:', errorText);
-        throw new Error(`Erro ao criar solicitação de pagamento: ${response.status}`);
+      if (!success) {
+        toast.error('Ocorreu um erro ao processar o pagamento. Tente novamente.');
+        setLoading(false);
       }
       
-      const data = await response.json();
-      
-      if (!data.payment_url) {
-        throw new Error('URL de pagamento não retornada pela API');
-      }
-      
-      // Salvar token para verificação posterior
-      if (data.token) {
-        localStorage.setItem('viralizamos_payment_token', data.token);
-        localStorage.setItem('viralizamos_payment_timestamp', new Date().toISOString());
-      }
-      
-      // Redirecionar para a URL de pagamento
-      console.log('Redirecionando para:', data.payment_url);
-      window.location.href = data.payment_url;
-      
-      setLoading(false);
+      // Não precisamos definir setLoading(false) aqui se o redirecionamento for bem-sucedido
+      // pois o usuário será redirecionado para outra página
     } catch (error) {
       console.error('Erro ao processar checkout:', error);
       toast.error('Ocorreu um erro ao processar o checkout. Tente novamente.');

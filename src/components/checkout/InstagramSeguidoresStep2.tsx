@@ -14,7 +14,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUsers, faCheckCircle } from '@fortawesome/free-solid-svg-icons';
 import { CouponInput } from '@/components/checkout/CouponInput';
 import { maskPhone } from '@/lib/utils/mask';
-import { directRedirectToPaymentService } from '@/lib/payment/redirectToPaymentService';
+import { processCheckoutAndRedirect } from '@/lib/payment/microservice-integration';
 
 interface InstagramSeguidoresStep2Props {
   title: string;
@@ -347,12 +347,14 @@ export function InstagramSeguidoresStep2({ title }: InstagramSeguidoresStep2Prop
       // Validar se temos os dados necessários
       if (!profileData || !service) {
         toast.error('Dados incompletos para finalizar o pedido');
+        setIsSubmitting(false);
         return;
       }
       
       // Validar campos do formulário
       if (!formData.name || !formData.email || !formData.phone) {
         toast.error('Preencha todos os campos do formulário');
+        setIsSubmitting(false);
         return;
       }
       
@@ -360,6 +362,7 @@ export function InstagramSeguidoresStep2({ title }: InstagramSeguidoresStep2Prop
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(formData.email)) {
         toast.error('Email inválido');
+        setIsSubmitting(false);
         return;
       }
       
@@ -367,96 +370,41 @@ export function InstagramSeguidoresStep2({ title }: InstagramSeguidoresStep2Prop
       const phoneRegex = /^\d{10,}$/;
       if (!phoneRegex.test(formData.phone.replace(/\D/g, ''))) {
         toast.error('Telefone inválido (mínimo 10 dígitos)');
+        setIsSubmitting(false);
         return;
       }
       
-      // Preparar dados para o pedido
-      const paymentData = {
-        service: {
+      // Calcular valor final
+      const finalPrice = finalAmount || service.preco;
+      
+      // Usar a nova função de integração com o microserviço
+      const success = await processCheckoutAndRedirect({
+        amount: finalPrice,
+        serviceData: {
           id: service.id,
-          name: service.nome || "Seguidores Instagram",
-          price: finalAmount || service.preco,
-          preco: finalAmount || service.preco,
+          name: service.nome || 'Seguidores Instagram',
+          price: finalPrice,
           quantity: service.quantidade,
-          quantidade: service.quantidade,
-          provider_id: service.provider_id || service.id
+          provider_id: service.provider_id
         },
-        profile: profileData,
-        customer: {
+        profileUsername: profileData.username,
+        selectedPosts: [],
+        customerData: {
           name: formData.name,
           email: formData.email,
           phone: formData.phone
         },
-        amount: finalAmount || service.preco,
-        appliedCoupon: appliedCoupon
-      };
-      
-      console.log('=> Enviando dados do pedido:', paymentData);
-      
-      // URL do microserviço de pagamento
-      const paymentServiceUrl = process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || 'https://pagamentos.viralizamos.com';
-      
-      // Preparar dados para enviar ao microserviço de pagamentos
-      const requestData = {
-        amount: finalAmount || service.preco,
-        service_id: String(service.id),
-        profile_username: profileData.username,
-        customer_email: formData.email,
-        customer_name: formData.name,
-        customer_phone: formData.phone,
-        service_name: service.nome || "Seguidores Instagram",
-        return_url: "/agradecimento",
-        additional_data: {
-          service_type: 'seguidores',
-          profile_follower_count: profileData.follower_count || 0,
-          profile_full_name: profileData.full_name || '',
-          profile_is_private: profileData.is_private || false,
-          profile_is_verified: profileData.is_verified || false,
-          source: 'viralizamos_site_v2',
-          origin: window.location.href,
-          timestamp: new Date().toISOString()
-        }
-      };
-      
-      console.log('Enviando dados para API de solicitação de pagamento:', requestData);
-      
-      // Enviar solicitação para o microserviço de pagamentos
-      const response = await fetch(`${paymentServiceUrl}/api/payment-request`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Payment-Source': 'viralizamos-site-v2',
-        },
-        body: JSON.stringify(requestData),
+        serviceType: 'seguidores',
+        returnUrl: "/agradecimento"
       });
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Erro na resposta do serviço de pagamentos:', errorText);
-        throw new Error(`Erro ao criar solicitação de pagamento: ${response.status}`);
+      if (!success) {
+        toast.error('Ocorreu um erro ao processar o pagamento. Tente novamente.');
+        setIsSubmitting(false);
       }
-      
-      const data = await response.json();
-      
-      if (!data.payment_url) {
-        throw new Error('URL de pagamento não retornada pela API');
-      }
-      
-      // Salvar token para verificação posterior
-      if (data.token) {
-        localStorage.setItem('viralizamos_payment_token', data.token);
-        localStorage.setItem('viralizamos_payment_timestamp', new Date().toISOString());
-      }
-      
-      // Redirecionar para a URL de pagamento
-      console.log('Redirecionando para:', data.payment_url);
-      window.location.href = data.payment_url;
-      
-      toast.success('Redirecionando para pagamento...');
     } catch (error) {
-      console.error('=> Erro ao finalizar pedido:', error);
-      toast.error(`Erro ao finalizar pedido: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
-    } finally {
+      console.error('Erro ao finalizar pedido:', error);
+      toast.error('Erro ao processar pagamento. Tente novamente.');
       setIsSubmitting(false);
     }
   };
