@@ -338,14 +338,22 @@ export function InstagramSeguidoresStep2({ title }: InstagramSeguidoresStep2Prop
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
+    if (isSubmitting) return;
+    
+    setIsSubmitting(true);
     
     try {
-      setIsSubmitting(true);
-      
+      // Validar se temos os dados necessários
       if (!profileData || !service) {
-        throw new Error('Dados de perfil ou serviço não encontrados');
+        toast.error('Dados incompletos para finalizar o pedido');
+        return;
+      }
+      
+      // Validar campos do formulário
+      if (!formData.name || !formData.email || !formData.phone) {
+        toast.error('Preencha todos os campos do formulário');
+        return;
       }
       
       // Validar formato de email
@@ -385,17 +393,64 @@ export function InstagramSeguidoresStep2({ title }: InstagramSeguidoresStep2Prop
       
       console.log('=> Enviando dados do pedido:', paymentData);
       
-      // Usar directRedirectToPaymentService em vez do modal
-      await directRedirectToPaymentService({
-        serviceId: String(service.id),
-        serviceName: service.nome || "Seguidores Instagram",
-        profileUsername: profileData.username,
+      // URL do microserviço de pagamento
+      const paymentServiceUrl = process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || 'https://pagamentos.viralizamos.com';
+      
+      // Preparar dados para enviar ao microserviço de pagamentos
+      const requestData = {
         amount: finalAmount || service.preco,
-        customerName: formData.name,
-        customerEmail: formData.email,
-        customerPhone: formData.phone,
-        returnUrl: "/agradecimento"
+        service_id: String(service.id),
+        profile_username: profileData.username,
+        customer_email: formData.email,
+        customer_name: formData.name,
+        customer_phone: formData.phone,
+        service_name: service.nome || "Seguidores Instagram",
+        return_url: "/agradecimento",
+        additional_data: {
+          service_type: 'seguidores',
+          profile_follower_count: profileData.follower_count || 0,
+          profile_full_name: profileData.full_name || '',
+          profile_is_private: profileData.is_private || false,
+          profile_is_verified: profileData.is_verified || false,
+          source: 'viralizamos_site_v2',
+          origin: window.location.href,
+          timestamp: new Date().toISOString()
+        }
+      };
+      
+      console.log('Enviando dados para API de solicitação de pagamento:', requestData);
+      
+      // Enviar solicitação para o microserviço de pagamentos
+      const response = await fetch(`${paymentServiceUrl}/api/payment-request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Payment-Source': 'viralizamos-site-v2',
+        },
+        body: JSON.stringify(requestData),
       });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Erro na resposta do serviço de pagamentos:', errorText);
+        throw new Error(`Erro ao criar solicitação de pagamento: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (!data.payment_url) {
+        throw new Error('URL de pagamento não retornada pela API');
+      }
+      
+      // Salvar token para verificação posterior
+      if (data.token) {
+        localStorage.setItem('viralizamos_payment_token', data.token);
+        localStorage.setItem('viralizamos_payment_timestamp', new Date().toISOString());
+      }
+      
+      // Redirecionar para a URL de pagamento
+      console.log('Redirecionando para:', data.payment_url);
+      window.location.href = data.payment_url;
       
       toast.success('Redirecionando para pagamento...');
     } catch (error) {
@@ -566,7 +621,7 @@ export function InstagramSeguidoresStep2({ title }: InstagramSeguidoresStep2Prop
               <Card className="p-6 bg-white shadow-md rounded-xl">
                 <h3 className="text-lg font-semibold mb-4 text-gray-800">Seus Dados</h3>
                 
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-4">
                   <div>
                     <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
                       Nome
@@ -632,7 +687,7 @@ export function InstagramSeguidoresStep2({ title }: InstagramSeguidoresStep2Prop
                   )}
                   
                   <Button
-                    type="submit"
+                    onClick={handleSubmit}
                     className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
                     disabled={isSubmitting || !profileData || !service}
                   >
@@ -645,7 +700,7 @@ export function InstagramSeguidoresStep2({ title }: InstagramSeguidoresStep2Prop
                       'Pagar com PIX'
                     )}
                   </Button>
-                </form>
+                </div>
               </Card>
             </div>
           </div>

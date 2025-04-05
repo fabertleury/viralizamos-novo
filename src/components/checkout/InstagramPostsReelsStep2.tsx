@@ -1739,17 +1739,62 @@ export function InstagramPostsReelsStep2({ serviceType, title }: InstagramPostsR
         localStorage.setItem('selectedReels', JSON.stringify(selectedReels));
       }
       
-      // Usar directRedirectToPaymentService em vez do modal
-      await directRedirectToPaymentService({
-        serviceId: service.id,
-        serviceName: service.name,
-        profileUsername: profileData?.username || '',
+      // URL do microserviço de pagamento
+      const paymentServiceUrl = process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || 'https://pagamentos.viralizamos.com';
+      
+      // Preparar dados para enviar ao microserviço de pagamentos
+      const requestData = {
         amount: finalPrice,
-        customerName: formData.name,
-        customerEmail: formData.email,
-        customerPhone: formData.phone,
-        returnUrl: "/agradecimento"
+        service_id: service.id,
+        profile_username: profileData?.username || '',
+        customer_email: formData.email,
+        customer_name: formData.name,
+        customer_phone: formData.phone,
+        service_name: service.name || 'Serviço Viralizamos',
+        return_url: "/agradecimento",
+        additional_data: {
+          posts: [...selectedPostsData, ...selectedReelsData],
+          quantity: service.quantidade || 1,
+          source: 'viralizamos_site_v2',
+          origin: window.location.href,
+          service_type: serviceType,
+          timestamp: new Date().toISOString()
+        }
+      };
+      
+      console.log('Enviando dados para API de solicitação de pagamento:', requestData);
+      
+      // Enviar solicitação para o microserviço de pagamentos
+      const response = await fetch(`${paymentServiceUrl}/api/payment-request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Payment-Source': 'viralizamos-site-v2',
+        },
+        body: JSON.stringify(requestData),
       });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Erro na resposta do serviço de pagamentos:', errorText);
+        throw new Error(`Erro ao criar solicitação de pagamento: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (!data.payment_url) {
+        throw new Error('URL de pagamento não retornada pela API');
+      }
+      
+      // Salvar token para verificação posterior
+      if (data.token) {
+        localStorage.setItem('viralizamos_payment_token', data.token);
+        localStorage.setItem('viralizamos_payment_timestamp', new Date().toISOString());
+      }
+      
+      // Redirecionar para a URL de pagamento
+      console.log('Redirecionando para:', data.payment_url);
+      window.location.href = data.payment_url;
       
       setLoading(false);
     } catch (error) {
@@ -2122,7 +2167,7 @@ export function InstagramPostsReelsStep2({ serviceType, title }: InstagramPostsR
                     
                     <div className="flex items-center justify-center mt-4">
                       <button 
-                        onClick={() => handleCheckout()}
+                        onClick={handleCheckout}
                         disabled={loading || selectedItemsCount === 0 || !formData.name || !formData.email || !formData.phone}
                         className={`
                           px-6 py-3 rounded-full font-bold text-sm uppercase tracking-wider 
