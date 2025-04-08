@@ -24,6 +24,8 @@ interface ServiceData {
   price?: number;
   quantity?: number;
   provider_id?: string;
+  external_id?: string;
+  external_service_id?: string;
 }
 
 interface PaymentServiceResponse {
@@ -69,10 +71,20 @@ export async function sendCheckoutToPaymentService({
       postsCount: selectedPosts.length
     });
     
+    // Verificar se temos o external_id do serviço
+    const externalServiceId = serviceData.external_id || serviceData.external_service_id;
+    
+    if (externalServiceId) {
+      console.log('Service ID externo identificado:', externalServiceId);
+    } else {
+      console.log('Service ID externo não encontrado, usando apenas o ID interno:', serviceData.id);
+    }
+    
     // Preparar dados para enviar ao microserviço de pagamentos
     const requestData = {
       amount,
       service_id: serviceData.id,
+      external_service_id: externalServiceId,
       profile_username: profileUsername,
       customer_email: customerData.email,
       customer_name: customerData.name,
@@ -90,6 +102,7 @@ export async function sendCheckoutToPaymentService({
         source: 'viralizamos_site_v2',
         origin: window.location.href,
         service_type: serviceType,
+        external_service_id: externalServiceId,
         timestamp: new Date().toISOString()
       }
     };
@@ -127,6 +140,7 @@ export async function sendCheckoutToPaymentService({
       localStorage.setItem('viralizamos_payment_data', JSON.stringify({
         amount,
         service_id: serviceData.id,
+        external_service_id: externalServiceId,
         profile_username: profileUsername,
         token: data.token
       }));
