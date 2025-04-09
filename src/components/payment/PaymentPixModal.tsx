@@ -13,6 +13,8 @@ export interface PaymentData {
   returnUrl?: string;
   posts?: string[];
   quantity?: number;
+  externalServiceId?: string; // ID do serviço no provedor externo
+  customerPhone?: string;     // Telefone do cliente
 }
 
 /**
@@ -52,14 +54,19 @@ export const PaymentService = {
       const paymentRequestData = {
         amount: dados.amount,
         service_id: dados.serviceId,
+        external_service_id: dados.externalServiceId, // ID do serviço no provedor externo
         profile_username: dados.profileUsername,
         customer_email: dados.customerEmail || 'cliente@viralizamos.com',
         customer_name: dados.customerName || 'Cliente',
+        customer_phone: dados.customerPhone || '',
         service_name: dados.serviceName || 'Serviço Viralizamos',
         return_url: dados.returnUrl || window.location.href,
         additional_data: {
           posts: dados.posts || [],
-          quantity: dados.quantity || 1
+          quantity: dados.quantity || 1,
+          external_service_id: dados.externalServiceId, // Repetindo no additional_data para garantir
+          source: 'viralizamos_site_v2',
+          origin: window.location.href
         }
       };
       
