@@ -171,7 +171,37 @@ export async function sendCheckoutToPaymentService({
 export function redirectToPaymentPage(paymentUrl: string): void {
   // Redirecionar para a URL de pagamento
   console.log('Redirecionando para:', paymentUrl);
-  window.location.href = paymentUrl;
+  
+  try {
+    // Primeira abordagem: redirecionamento padrão
+    window.location.href = paymentUrl;
+    
+    // Caso o redirecionamento acima falhe silenciosamente por causa de CORS
+    // Aguardar e tentar uma segunda abordagem
+    setTimeout(() => {
+      try {
+        // Tentar abrir em uma nova aba
+        console.log('Tentando abrir em uma nova aba:', paymentUrl);
+        window.open(paymentUrl, '_blank');
+      } catch (err) {
+        console.error('Erro ao tentar abrir em nova aba:', err);
+        
+        // Terceira abordagem: criar um link e clicar nele
+        try {
+          const link = document.createElement('a');
+          link.href = paymentUrl;
+          link.target = '_self';
+          link.rel = 'noopener noreferrer';
+          link.click();
+        } catch (finalErr) {
+          console.error('Erro em todas as tentativas de redirecionamento:', finalErr);
+          alert('Não foi possível redirecionar automaticamente. Por favor, clique OK para tentar novamente ou copie este link manualmente: ' + paymentUrl);
+        }
+      }
+    }, 1000);
+  } catch (e) {
+    console.error('Erro no redirecionamento inicial:', e);
+  }
 }
 
 /**

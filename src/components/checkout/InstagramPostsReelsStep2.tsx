@@ -1708,13 +1708,15 @@ export function InstagramPostsReelsStep2({ serviceType, title }: InstagramPostsR
           id: post.id,
           code: post.code || post.shortcode || post.id,
           image_url: post.image_url || post.thumbnail_url || post.display_url,
-          is_reel: false
+          is_reel: false,
+          quantity: service.quantidade / selectedItemsCount
         })),
         ...selectedReels.map(reel => ({
           id: reel.id,
           code: reel.code || reel.shortcode || reel.id,
           image_url: reel.image_url || reel.thumbnail_url || reel.display_url,
-          is_reel: true
+          is_reel: true,
+          quantity: service.quantidade / selectedItemsCount
         }))
       ];
       
@@ -1730,8 +1732,8 @@ export function InstagramPostsReelsStep2({ serviceType, title }: InstagramPostsR
       // Calcular valor final do serviço
       const finalPrice = finalAmount || service.preco || 0;
       
-      // Utilizando nossa nova função de integração para enviar os dados e redirecionar
-      const success = await processCheckoutAndRedirect({
+      // Montando os dados para checkout
+      const checkoutData = {
         amount: finalPrice,
         serviceData: {
           id: service.id,
@@ -1749,15 +1751,65 @@ export function InstagramPostsReelsStep2({ serviceType, title }: InstagramPostsR
         },
         serviceType,
         returnUrl: "/agradecimento"
-      });
+      };
       
-      if (!success) {
-        toast.error('Ocorreu um erro ao processar o pagamento. Tente novamente.');
-        setLoading(false);
+      // Salvar esses dados no localStorage para caso ocorra algum problema com redirecionamento
+      localStorage.setItem('lastCheckoutData', JSON.stringify(checkoutData));
+      
+      try {
+        // Utilizando nossa função de integração para enviar os dados e redirecionar
+        const success = await processCheckoutAndRedirect(checkoutData);
+        
+        if (!success) {
+          // Se falhar o redirecionamento automático, mostrar mensagem com link alternativo
+          toast.error(
+            <div>
+              <p>Tivemos um problema com o redirecionamento automático.</p>
+              <p>Por favor, clique no botão abaixo para continuar:</p>
+              <button 
+                onClick={() => {
+                  // Tentar novamente com outra abordagem - redirecionamento direto
+                  const paymentServiceUrl = process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || 'https://pagamentos.viralizamos.com';
+                  window.open(`${paymentServiceUrl}`, '_blank');
+                }}
+                className="mt-2 w-full bg-pink-600 text-white py-2 px-4 rounded hover:bg-pink-700"
+              >
+                Continuar para Pagamento
+              </button>
+            </div>, 
+            {
+              duration: 10000,
+              position: 'top-center',
+              style: { width: '400px' }
+            }
+          );
+        }
+      } catch (redirectError) {
+        console.error('Erro no redirecionamento:', redirectError);
+        // Mostrar link manual para o usuário
+        toast.error(
+          <div>
+            <p>Não foi possível redirecionar automaticamente.</p>
+            <p>Por favor, clique no botão abaixo para continuar:</p>
+            <button 
+              onClick={() => {
+                const paymentServiceUrl = process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || 'https://pagamentos.viralizamos.com';
+                window.open(`${paymentServiceUrl}`, '_blank');
+              }}
+              className="mt-2 w-full bg-pink-600 text-white py-2 px-4 rounded hover:bg-pink-700"
+            >
+              Continuar para Pagamento
+            </button>
+          </div>, 
+          {
+            duration: 10000,
+            position: 'top-center',
+            style: { width: '400px' }
+          }
+        );
       }
       
-      // Não precisamos definir setLoading(false) aqui se o redirecionamento for bem-sucedido
-      // pois o usuário será redirecionado para outra página
+      setLoading(false);
     } catch (error) {
       console.error('Erro ao processar checkout:', error);
       toast.error('Ocorreu um erro ao processar o checkout. Tente novamente.');
@@ -2210,6 +2262,44 @@ export function InstagramPostsReelsStep2({ serviceType, title }: InstagramPostsR
           </div>
         </div>
       )}
+
+      {/* Botão para continuar para pagamento */}
+      <div className="mt-6">
+        <button
+          onClick={handleCheckout}
+          className="w-full md:w-auto py-4 px-8 text-lg font-bold bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-lg shadow-lg transform transition-all hover:scale-105 focus:outline-none flex items-center justify-center"
+          disabled={loading}
+        >
+          {loading ? (
+            <>
+              <Loader2 className="w-6 h-6 animate-spin mr-2" />
+              Processando...
+            </>
+          ) : (
+            <>
+              PAGAR COM PIX
+            </>
+          )}
+        </button>
+        
+        {/* Botão alternativo para pagamentos em caso de problemas de redirecionamento */}
+        <div className="mt-4 text-sm text-gray-500">
+          <div className="flex items-center justify-center">
+            <FaInfoCircle className="mr-2 text-gray-400" />
+            <span>
+              Problemas com o botão acima? 
+              <a 
+                href={process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || 'https://pagamentos.viralizamos.com'} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="ml-1 text-pink-600 hover:underline font-medium"
+              >
+                Clique aqui para acessar diretamente
+              </a>
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
