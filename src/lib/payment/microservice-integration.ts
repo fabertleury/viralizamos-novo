@@ -71,11 +71,20 @@ export async function sendCheckoutToPaymentService({
       postsCount: selectedPosts.length
     });
     
-    // Verificar se temos o external_id do serviço
-    const externalServiceId = serviceData.external_id || serviceData.external_service_id;
+    // Priorizar o external_id (que já é um número simples) como ID do serviço no provedor
+    // Conforme visto no banco de dados, esse valor já é numérico como "1528"
+    let externalServiceId = serviceData.external_id || serviceData.provider_id || serviceData.external_service_id;
     
-    if (externalServiceId) {
-      console.log('Service ID externo identificado:', externalServiceId);
+    // Garantir que o ID externo seja um formato numérico
+    // Se for um UUID (formato xxxxx-xxxx-xxxx-xxxx), converter para um número simples
+    if (externalServiceId && typeof externalServiceId === 'string' && externalServiceId.includes('-')) {
+      console.log('Convertendo external_id de formato UUID para número:', externalServiceId);
+      // Extrair apenas os dígitos do ID ou usar hash numérico simples
+      const numericId = externalServiceId.replace(/-/g, '').slice(0, 10);
+      externalServiceId = numericId;
+      console.log('ID externo convertido para formato numérico:', externalServiceId);
+    } else if (externalServiceId) {
+      console.log('Service ID externo já está em formato adequado:', externalServiceId);
     } else {
       console.log('Service ID externo não encontrado, usando apenas o ID interno:', serviceData.id);
     }
@@ -103,6 +112,7 @@ export async function sendCheckoutToPaymentService({
         origin: window.location.href,
         service_type: serviceType,
         external_service_id: externalServiceId,
+        provider_id: serviceData.provider_id,
         timestamp: new Date().toISOString()
       }
     };

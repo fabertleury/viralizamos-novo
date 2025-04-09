@@ -169,13 +169,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Serviço não possui ID externo configurado' }, { status: 400 });
     }
     
+    // Garantir que o external_id esteja em formato numérico
+    let externalId = service.external_id;
+    if (typeof externalId === 'string' && externalId.includes('-')) {
+      console.log('Convertendo external_id de formato UUID para numérico:', externalId);
+      // Extrair apenas os dígitos do UUID ou usar uma parte dele
+      externalId = externalId.replace(/-/g, '').slice(0, 10);
+      console.log('external_id convertido para formato numérico:', externalId);
+    } else {
+      console.log('external_id já está em formato adequado:', externalId);
+    }
+    
     // Preparar os dados para a requisição ao provedor
-    const providerRequestData = {
+    const providerRequestData: Record<string, string> = {
       key: apiKey,
       action: 'add',
-      service: service.external_id.toString(),
+      service: String(externalId),
       link: formattedLink,
-      quantity: quantity.toString()
+      quantity: String(quantity)
     };
     
     // Converter para formato x-www-form-urlencoded manualmente
@@ -191,7 +202,7 @@ export async function POST(request: NextRequest) {
     console.log('Enviando para o provedor:');
     console.log(`key: ${apiKey}`);
     console.log(`action: add`);
-    console.log(`service: ${service.external_id.toString()}`);
+    console.log(`service: ${externalId.toString()}`);
     console.log(`link: ${formattedLink}`);
     console.log(`quantity: ${quantity.toString()}`);
     

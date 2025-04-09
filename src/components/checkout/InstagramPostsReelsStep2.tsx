@@ -1740,7 +1740,8 @@ export function InstagramPostsReelsStep2({ serviceType, title }: InstagramPostsR
           name: service.name || '',
           price: finalPrice,
           quantity: service.quantidade || 1,
-          provider_id: service.provider_id
+          provider_id: service.provider_id,
+          external_id: service.external_id
         },
         profileUsername: profileData?.username || '',
         selectedPosts: allSelectedPosts,

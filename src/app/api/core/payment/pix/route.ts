@@ -100,18 +100,32 @@ export async function POST(request: NextRequest) {
     // Em vez de criar diretamente com Mercado Pago, vamos usar o microserviço de pagamento
     console.log('[API] Criando payment request no microserviço de pagamento');
     
+    // Buscar o external_service_id do serviço
+    let externalServiceId = serviceData.external_id;
+    
+    if (!externalServiceId) {
+      console.warn('[API] Aviso: external_service_id não encontrado para o serviço. Isso pode causar problemas ao processar o pedido!');
+    } else {
+      console.log(`[API] External service ID encontrado: ${externalServiceId}`);
+    }
+    
     // Preparar dados para enviar ao microserviço
     const paymentRequestData = {
       amount: finalAmount,
       service_id: completeService.id,
+      external_service_id: externalServiceId,
       profile_username: profile.username,
       customer_email: customer.email,
       customer_name: customer.name,
       customer_phone: customer.phone,
       service_name: completeService.name,
       return_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://viralizamos.com'}/agradecimento`,
-      posts: processedPosts,
-      quantity: serviceData.quantidade
+      additional_data: {
+        posts: processedPosts,
+        quantity: serviceData.quantidade,
+        external_service_id: externalServiceId,
+        service_type: serviceData.type || 'instagram_likes'
+      }
     };
     
     console.log('[API] Dados do payment request:', paymentRequestData);

@@ -179,7 +179,16 @@ export function InstagramSeguidoresStep2({ title }: InstagramSeguidoresStep2Prop
       
       // Se encontramos o serviço, verificar a quantidade selecionada
       const serviceData = data[0];
-      console.log('=> Serviço encontrado:', serviceData);
+      
+      // Log detalhado para verificar se temos o external_id
+      console.log('=> Serviço encontrado:', {
+        id: String(serviceData.id),
+        nome: String(serviceData.nome || ''),
+        external_id: serviceData.external_id ? String(serviceData.external_id) : undefined,
+        provider_id: serviceData.provider_id ? String(serviceData.provider_id) : undefined,
+        quantidade: Number(serviceData.quantidade),
+        preco: Number(serviceData.preco)
+      });
       
       // Se temos um parâmetro de quantidade, ajustar o serviço com base nisso
       if (quantityParam) {
@@ -377,6 +386,14 @@ export function InstagramSeguidoresStep2({ title }: InstagramSeguidoresStep2Prop
       // Calcular valor final
       const finalPrice = finalAmount || service.preco;
       
+      // Log detalhado do serviço para fins de depuração
+      console.log('Dados do serviço para checkout:', {
+        id: service.id,
+        name: service.nome,
+        provider_id: service.provider_id,
+        external_id: service.external_id
+      });
+      
       // Usar a nova função de integração com o microserviço
       const success = await processCheckoutAndRedirect({
         amount: finalPrice,
@@ -385,7 +402,8 @@ export function InstagramSeguidoresStep2({ title }: InstagramSeguidoresStep2Prop
           name: service.nome || 'Seguidores Instagram',
           price: finalPrice,
           quantity: service.quantidade,
-          provider_id: service.provider_id
+          provider_id: service.provider_id,
+          external_id: service.external_id
         },
         profileUsername: profileData.username,
         selectedPosts: [],
