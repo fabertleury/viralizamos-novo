@@ -2262,44 +2262,6 @@ export function InstagramPostsReelsStep2({ serviceType, title }: InstagramPostsR
           </div>
         </div>
       )}
-
-      {/* Botão para continuar para pagamento */}
-      <div className="mt-6">
-        <button
-          onClick={handleCheckout}
-          className="w-full md:w-auto py-4 px-8 text-lg font-bold bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-lg shadow-lg transform transition-all hover:scale-105 focus:outline-none flex items-center justify-center"
-          disabled={loading}
-        >
-          {loading ? (
-            <>
-              <Loader2 className="w-6 h-6 animate-spin mr-2" />
-              Processando...
-            </>
-          ) : (
-            <>
-              PAGAR COM PIX
-            </>
-          )}
-        </button>
-        
-        {/* Botão alternativo para pagamentos em caso de problemas de redirecionamento */}
-        <div className="mt-4 text-sm text-gray-500">
-          <div className="flex items-center justify-center">
-            <FaInfoCircle className="mr-2 text-gray-400" />
-            <span>
-              Problemas com o botão acima? 
-              <a 
-                href={process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || 'https://pagamentos.viralizamos.com'} 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="ml-1 text-pink-600 hover:underline font-medium"
-              >
-                Clique aqui para acessar diretamente
-              </a>
-            </span>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
