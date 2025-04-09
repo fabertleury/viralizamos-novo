@@ -2,7 +2,7 @@
 
 ## Problema Identificado
 
-O sistema estava utilizando bloqueios de longa duração (1 ano) para prevenir duplicação de pedidos para o mesmo post e serviço. Isso impedia que clientes pudessem solicitar serviços adicionais para o mesmo post após um período razoável, criando uma limitação desnecessária para o negócio.
+O sistema estava utilizando bloqueios de longa duração (1 ano) para prevenir duplicação de pedidos para o mesmo post e serviço. Isso impedia que clientes pudessem solicitar serviços adicionais para o mesmo post após um período razoável, criando uma limitação desnecessária para o negócio..
 
 ## Alterações Implementadas
 
