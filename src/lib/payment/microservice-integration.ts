@@ -89,6 +89,12 @@ export async function sendCheckoutToPaymentService({
       console.log('Service ID externo não encontrado, usando apenas o ID interno:', serviceData.id);
     }
     
+    // Registrar o ID externo original para rastreamento
+    console.log('Registrando informações de IDs para rastreamento:');
+    console.log('- ID do serviço (interno):', serviceData.id);
+    console.log('- ID do serviço no provedor (externo):', externalServiceId);
+    console.log('- ID original no provedor:', serviceData.external_id);
+    
     // Preparar dados para enviar ao microserviço de pagamentos
     const requestData = {
       amount,
@@ -105,15 +111,23 @@ export async function sendCheckoutToPaymentService({
           id: post.id,
           code: post.code || post.shortcode || post.id,
           image_url: post.image_url || '',
-          is_reel: post.is_reel || false
+          is_reel: post.is_reel || false,
+          type: post.is_reel ? 'reel' : 'post',
+          quantity: (post as any).quantity || Math.ceil((serviceData.quantity || 1) / selectedPosts.length),
+          calculated_quantity: (post as any).calculated_quantity || Math.ceil((serviceData.quantity || 1) / selectedPosts.length)
         })),
         quantity: serviceData.quantity || 1,
         source: 'viralizamos_site_v2',
         origin: window.location.href,
         service_type: serviceType,
+        // Incluir tanto o ID externo processado quanto o original para maior rastreabilidade
         external_service_id: externalServiceId,
+        original_external_id: serviceData.external_id,
         provider_id: serviceData.provider_id,
-        timestamp: new Date().toISOString()
+        service_provider_id: serviceData.provider_id,
+        timestamp: new Date().toISOString(),
+        total_quantity: serviceData.quantity || 1,
+        posts_count: selectedPosts.length
       }
     };
     

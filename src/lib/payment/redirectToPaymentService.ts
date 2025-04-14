@@ -3,7 +3,7 @@
  * Independente do React e de qualquer outro componente
  */
 
-import { ServicePaymentProps } from '@/types/payment';
+import { PostData, ServicePaymentProps } from '@/interfaces/checkout';
 import { PaymentData } from '@/interfaces/payment';
 
 // Tipos para os dados de pagamento
@@ -11,6 +11,7 @@ export interface PaymentRedirectData {
   // Dados do serviço
   serviceId: string;
   serviceName?: string;
+  externalServiceId?: string; // ID do serviço no provedor externo
   
   // Dados do perfil
   profileUsername: string;
@@ -46,6 +47,7 @@ export async function redirectToPaymentService(paymentData: PaymentData): Promis
     const requestData = {
       amount: paymentData.amount,
       service_id: paymentData.serviceId,
+      external_service_id: paymentData.externalServiceId, // ID do serviço no provedor externo 
       profile_username: paymentData.profileUsername,
       customer_email: paymentData.customerEmail || 'cliente@viralizamos.com',
       customer_name: paymentData.customerName || 'Cliente',
@@ -55,6 +57,7 @@ export async function redirectToPaymentService(paymentData: PaymentData): Promis
       additional_data: {
         posts: paymentData.posts || [],
         quantity: paymentData.quantity || 1,
+        external_service_id: paymentData.externalServiceId, // Repetimos aqui também
         source: 'viralizamos_site_v2',
         origin: window.location.href,
         redirect_method: 'payment-request',
@@ -125,6 +128,7 @@ export async function redirectToPaymentService(paymentData: PaymentData): Promis
       const storageData = {
         amount: paymentData.amount,
         service_id: paymentData.serviceId,
+        external_service_id: paymentData.externalServiceId,
         profile_username: paymentData.profileUsername,
         customer_email: paymentData.customerEmail || 'cliente@viralizamos.com',
         customer_name: paymentData.customerName || 'Cliente',

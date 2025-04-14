@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useLayoutEffect } from 'react';
 import { Header } from '@/components/layout/header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { formatDateToBrasilia } from '@/lib/utils/date';
 import { RefreshCw, Loader2 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 interface Refill {
   id: string;
@@ -91,11 +92,20 @@ interface Transaction {
 }
 
 export default function AcompanharPedidoPage() {
+  const router = useRouter();
+  
+  // Redirecionamento para o microserviço de pagamentos
+  useLayoutEffect(() => {
+    // Redirecionamento para a nova página de acompanhamento
+    window.location.href = 'https://pagamentos.viralizamos.com/acompanhar';
+  }, []);
+  
+  // Mantemos a estrutura original caso o redirecionamento automático falhe
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-pink-500" />
-        <span className="ml-2 text-xl font-medium">Carregando...</span>
+        <span className="ml-2 text-xl font-medium">Redirecionando...</span>
       </div>
     }>
       <AcompanharPedidoContent />
