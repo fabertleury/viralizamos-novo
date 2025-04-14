@@ -137,9 +137,9 @@ export function Header() {
               </Link>
             </Button>
             <Button asChild variant="ghost" className="font-medium bg-[#C43582] text-white hover:bg-[#a62c6c]">
-              <Link href="/acompanhar-pedido">
+              <a href="https://pagamentos.viralizamos.com/acompanhar" target="_blank" rel="noopener noreferrer">
                 {translations.header.trackOrder}
-              </Link>
+              </a>
             </Button>
             
             {/* Tickets - só aparece se logado */}
@@ -204,9 +204,9 @@ export function Header() {
                       className="w-full font-medium bg-[#C43582] text-white hover:bg-[#a62c6c] mb-3"
                       onClick={() => setIsMenuOpen(false)}
                     >
-                      <Link href="/acompanhar-pedido">
+                      <a href="https://pagamentos.viralizamos.com/acompanhar" target="_blank" rel="noopener noreferrer">
                         {translations.header.trackOrder}
-                      </Link>
+                      </a>
                     </Button>
                     
                     {isLoggedIn && (
