@@ -112,7 +112,7 @@ function ProfileAnalyzerContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeContentTab, setActiveContentTab] = useState<'posts' | 'reels'>('posts');
-  const { fetchInstagramProfileInfo, fetchContent, fetchUserStories } = useInstagramAPI();
+  const { fetchInstagramProfileInfo, fetchContent, fetchUserStories, getBaseUrl } = useInstagramAPI();
   const searchParams = useSearchParams();
 
   // Estado para controlar o modal de confirmação

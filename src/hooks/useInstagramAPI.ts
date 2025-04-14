@@ -839,6 +839,7 @@ export const useInstagramAPI = () => {
     fetchInstagramProfileInfo,
     fetchRocketAPIMedia,
     fetchUserStories,
-    fetchUserTags
+    fetchUserTags,
+    getBaseUrl
   };
 };
