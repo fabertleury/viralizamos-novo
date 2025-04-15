@@ -137,7 +137,7 @@ export function Header() {
               </Link>
             </Button>
             <Button asChild variant="ghost" className="font-medium bg-[#E91E63] text-white hover:bg-[#c2185b]">
-              <a href="https://pagamentos.viralizamos.com/acompanhar" target="_blank" rel="noopener noreferrer">
+              <a href="https://pagamentos.viralizamos.com/acompanhar">
                 🔎 {translations.header.trackOrder}
               </a>
             </Button>
@@ -204,7 +204,7 @@ export function Header() {
                       className="w-full font-medium bg-[#E91E63] text-white hover:bg-[#c2185b] mb-3"
                       onClick={() => setIsMenuOpen(false)}
                     >
-                      <a href="https://pagamentos.viralizamos.com/acompanhar" target="_blank" rel="noopener noreferrer">
+                      <a href="https://pagamentos.viralizamos.com/acompanhar">
                         🔎 {translations.header.trackOrder}
                       </a>
                     </Button>
