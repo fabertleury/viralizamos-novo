@@ -112,7 +112,7 @@ function ProfileAnalyzerContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeContentTab, setActiveContentTab] = useState<'posts' | 'reels'>('posts');
-  const { fetchInstagramProfileInfo, fetchContent, fetchUserStories } = useInstagramAPI();
+  const { fetchInstagramProfileInfo, fetchContent, fetchUserStories, getBaseUrl } = useInstagramAPI();
   const searchParams = useSearchParams();
 
   // Estado para controlar o modal de confirmação
@@ -548,7 +548,7 @@ function ProfileAnalyzerContent() {
       setTimer(30); // Reiniciar o timer para 30 segundos
 
       // Verificar o perfil usando a API Rocket
-      console.log('Verificando perfil do Instagram com RocketAPI:', username);
+      console.log('Verificando perfil do Instagram com nossa Inteligência Artificial 🤖:', username);
       
       // Usar o rocket-check como verificador principal
       const baseUrl = getBaseUrl();
@@ -566,7 +566,7 @@ function ProfileAnalyzerContent() {
         throw new Error(data.message || 'Erro ao verificar perfil');
       }
 
-      console.log('Resposta da RocketAPI:', data);
+      console.log('Resposta da nossa Inteligência Artificial 🤖:', data);
       
       // Formatar os dados do perfil
       const profileInfo = {
@@ -603,18 +603,18 @@ function ProfileAnalyzerContent() {
       });
 
       // Buscar posts e stories exclusivamente com RocketAPI
-      toast.info('Buscando conteúdo do Instagram com RocketAPI...');
+      toast.info('Buscando conteúdo do Instagram com nossa Inteligência Artificial 🤖...');
       
       // Buscar posts/reels
       try {
-        console.log('Buscando conteúdo (posts/reels) com RocketAPI');
+        console.log('Buscando conteúdo (posts/reels) com nossa Inteligência Artificial 🤖');
         const contentResult = await fetchContent(username, 'profile_analysis');
         
         if (contentResult.length === 0) {
-          console.warn('RocketAPI não retornou conteúdo');
+          console.warn('Nossa IA não retornou conteúdo');
           toast.warning('Não foi possível obter posts ou reels deste perfil. A análise pode ser limitada.');
         } else {
-          console.log(`RocketAPI retornou ${contentResult.length} itens de conteúdo`);
+          console.log(`Nossa IA retornou ${contentResult.length} itens de conteúdo`);
           
           // Contar tipos de conteúdo
           const postsCount = contentResult.filter(item => 
@@ -629,28 +629,28 @@ function ProfileAnalyzerContent() {
           setContentData(contentResult);
         }
       } catch (contentError) {
-        console.error('Erro ao buscar conteúdo com RocketAPI:', contentError);
+        console.error('Erro ao buscar conteúdo com nossa IA:', contentError);
         toast.error('Erro ao buscar posts e reels. Tente novamente mais tarde.');
       }
       
       // Buscar stories
       try {
         setLoadingStories(true);
-        console.log('Buscando stories com RocketAPI');
+        console.log('Buscando stories com nossa Inteligência Artificial 🤖');
         
         const stories = await fetchUserStories(username);
         
         if (stories && stories.items && stories.items.length > 0) {
-          console.log(`RocketAPI retornou ${stories.items.length} stories`);
+          console.log(`Nossa IA retornou ${stories.items.length} stories`);
           setStoriesData(stories);
           toast.success(`Encontrados ${stories.items.length} stories`);
         } else {
-          console.log('RocketAPI não encontrou stories para este usuário');
+          console.log('Nossa IA não encontrou stories para este usuário');
           setStoriesData(null);
           toast.info('Não há stories ativos para este perfil no momento.');
         }
       } catch (storiesError) {
-        console.error('Erro ao buscar stories com RocketAPI:', storiesError);
+        console.error('Erro ao buscar stories com nossa IA:', storiesError);
         setStoriesData(null);
       } finally {
         setLoadingStories(false);
@@ -658,7 +658,7 @@ function ProfileAnalyzerContent() {
       
       // Análise concluída
       setLoading(false);
-      toast.success('Análise de perfil concluída com RocketAPI!');
+      toast.success('Análise de perfil concluída com nossa Inteligência Artificial 🤖!');
       
     } catch (error) {
       console.error('Erro na análise do perfil:', error);
