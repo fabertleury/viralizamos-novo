@@ -221,7 +221,7 @@ const RedesSociaisSection = () => {
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
           <h2 className="text-4xl font-bold mb-4">O Poder das Redes Sociais</h2>
-          <p className="text-xl">Por que aumentar seus Seguidores?</p>
+          <p className="text-xl">Como fortalecer sua presença digital?</p>
         </div>
         
         <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
@@ -808,8 +808,6 @@ export default function HomeV3() {
         <ServicosSection />
         <RedesSociaisSection />
         <DepoimentosSection />
-        <FAQSection />
-
       </main>
 
       {renderFloatingButtons()}

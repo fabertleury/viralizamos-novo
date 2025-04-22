@@ -198,7 +198,7 @@ export default function InstagramPage() {
                   Serviços para Instagram
                 </h2>
                 <p className="text-xl md:text-2xl mb-0">
-                  Escolha o serviço que você precisa para impulsionar seu perfil no Instagram
+                  Escolha o que você precisa para o seu perfil
                 </p>
               </div>
             </div>
