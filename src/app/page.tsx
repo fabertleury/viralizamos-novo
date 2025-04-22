@@ -108,7 +108,6 @@ const ServicosSection = () => {
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold mb-4">Serviços de qualidade, Sigilo total!</h2>
-          <p className="text-xl text-gray-600">Por que comprar no Viralizamos?</p>
         </div>
         
         <div className="grid md:grid-cols-2 gap-8">
