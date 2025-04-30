@@ -1771,7 +1771,13 @@ export function InstagramPostsReelsStep2({ serviceType, title }: InstagramPostsR
                 onClick={() => {
                   // Tentar novamente com outra abordagem - redirecionamento direto
                   const paymentServiceUrl = process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || 'https://pagamentos.viralizamos.com';
-                  window.open(`${paymentServiceUrl}`, '_blank');
+                  // Redirecionar para a página de pagamento com o token
+                  if (data && data.token) {
+                    window.open(`${paymentServiceUrl}/pagamento/${data.token}`, '_blank');
+                  } else {
+                    console.error('Token de pagamento não disponível para redirecionamento');
+                    window.open(`${paymentServiceUrl}`, '_blank');
+                  }
                 }}
                 className="mt-2 w-full bg-pink-600 text-white py-2 px-4 rounded hover:bg-pink-700"
               >
@@ -1795,6 +1801,20 @@ export function InstagramPostsReelsStep2({ serviceType, title }: InstagramPostsR
             <button 
               onClick={() => {
                 const paymentServiceUrl = process.env.NEXT_PUBLIC_PAYMENT_SERVICE_URL || 'https://pagamentos.viralizamos.com';
+                // Tentar usar o token se disponível no localStorage
+                try {
+                  const storedPayment = localStorage.getItem('viralizamos_payment');
+                  if (storedPayment) {
+                    const paymentData = JSON.parse(storedPayment);
+                    if (paymentData.token) {
+                      window.open(`${paymentServiceUrl}/pagamento/${paymentData.token}`, '_blank');
+                      return;
+                    }
+                  }
+                } catch (error) {
+                  console.error('Erro ao recuperar token do localStorage:', error);
+                }
+                // Fallback para URL base
                 window.open(`${paymentServiceUrl}`, '_blank');
               }}
               className="mt-2 w-full bg-pink-600 text-white py-2 px-4 rounded hover:bg-pink-700"
@@ -2025,7 +2045,7 @@ export function InstagramPostsReelsStep2({ serviceType, title }: InstagramPostsR
                   
                   <div className="pt-4 mt-4 border-t space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span>Quantidade de {serviceType === 'curtidas' ? 'curtidas' : serviceType === 'visualizacao' ? 'visualizações' : 'comentários'}:</span>
+                      <span>Quantidade de {serviceType === 'curtidas' ? 'curtidas' : serviceType === 'visualizacao' || serviceType === 'reels' ? 'visualizações' : 'comentários'}:</span>
                       <span>{service?.quantidade ? service.quantidade.toLocaleString() : '0'}</span>
                     </div>
                     
@@ -2034,14 +2054,14 @@ export function InstagramPostsReelsStep2({ serviceType, title }: InstagramPostsR
                         {!hasUnevenDistribution ? (
                           // Divisão exata
                           <div className="flex justify-between text-sm">
-                            <span>{serviceType === 'curtidas' ? 'Curtidas' : serviceType === 'visualizacao' ? 'Visualizações' : 'Comentários'} por item:</span>
+                            <span>{serviceType === 'curtidas' ? 'Curtidas' : serviceType === 'visualizacao' || serviceType === 'reels' ? 'Visualizações' : 'Comentários'} por item:</span>
                             <span>{baseQuantityPerItem.toLocaleString()}</span>
                           </div>
                         ) : (
                           // Divisão com resto
                           <div className="space-y-1">
                             <div className="flex justify-between text-sm">
-                              <span>{serviceType === 'curtidas' ? 'Curtidas' : serviceType === 'visualizacao' ? 'Visualizações' : 'Comentários'} por item:</span>
+                              <span>{serviceType === 'curtidas' ? 'Curtidas' : serviceType === 'visualizacao' || serviceType === 'reels' ? 'Visualizações' : 'Comentários'} por item:</span>
                               <span className="font-semibold">Distribuição detalhada</span>
                             </div>
                             {itemDistribution.map((quantity, index) => (
