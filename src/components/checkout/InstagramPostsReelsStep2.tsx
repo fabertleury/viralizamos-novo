@@ -2156,13 +2156,13 @@ export function InstagramPostsReelsStep2({ serviceType, title }: InstagramPostsR
                     {/* Mensagem explicativa sobre curtidas/visualizações */}
                     <div className="mt-2 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
                       {selectedItemsCount === 0 ? (
-                        <p>Selecione entre 1 e 5 posts/reels para distribuir o total de {serviceType === 'curtidas' ? 'curtidas' : serviceType === 'visualizacao' ? 'visualizações' : 'comentários'}.</p>
+                        <p>Selecione entre 1 e 5 posts/reels para distribuir o total de {serviceType === 'curtidas' ? 'curtidas' : serviceType === 'visualizacao' || serviceType === 'reels' ? 'visualizações' : 'comentários'}.</p>
                       ) : selectedItemsCount === 1 ? (
-                        <p>Todas as {service?.quantidade ? service.quantidade.toLocaleString() : '0'} {serviceType === 'curtidas' ? 'curtidas' : serviceType === 'visualizacao' ? 'visualizações' : 'comentários'} serão aplicadas no item selecionado.</p>
+                        <p>Todas as {service?.quantidade ? service.quantidade.toLocaleString() : '0'} {serviceType === 'curtidas' ? 'curtidas' : serviceType === 'visualizacao' || serviceType === 'reels' ? 'visualizações' : 'comentários'} serão aplicadas no item selecionado.</p>
                       ) : hasUnevenDistribution ? (
-                        <p>O total de {service?.quantidade ? service.quantidade.toLocaleString() : '0'} {serviceType === 'curtidas' ? 'curtidas' : serviceType === 'visualizacao' ? 'visualizações' : 'comentários'} será distribuído entre os {selectedItemsCount} itens ({baseQuantityPerItem} por item + {remainderQuantity} extra{remainderQuantity > 1 ? 's' : ''} para o{remainderQuantity > 1 ? 's' : ''} primeiro{remainderQuantity > 1 ? 's' : ''}).</p>
+                        <p>O total de {service?.quantidade ? service.quantidade.toLocaleString() : '0'} {serviceType === 'curtidas' ? 'curtidas' : serviceType === 'visualizacao' || serviceType === 'reels' ? 'visualizações' : 'comentários'} será distribuído entre os {selectedItemsCount} itens ({baseQuantityPerItem} por item + {remainderQuantity} extra{remainderQuantity > 1 ? 's' : ''} para o{remainderQuantity > 1 ? 's' : ''} primeiro{remainderQuantity > 1 ? 's' : ''}).</p>
                       ) : (
-                        <p>O total de {service?.quantidade ? service.quantidade.toLocaleString() : '0'} {serviceType === 'curtidas' ? 'curtidas' : serviceType === 'visualizacao' ? 'visualizações' : 'comentários'} será dividido igualmente ({baseQuantityPerItem} por item) entre os {selectedItemsCount} itens selecionados.</p>
+                        <p>O total de {service?.quantidade ? service.quantidade.toLocaleString() : '0'} {serviceType === 'curtidas' ? 'curtidas' : serviceType === 'visualizacao' || serviceType === 'reels' ? 'visualizações' : 'comentários'} será dividido igualmente ({baseQuantityPerItem} por item) entre os {selectedItemsCount} itens selecionados.</p>
                       )}
                     </div>
                   </div>
