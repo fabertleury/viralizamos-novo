@@ -1,5 +1,0 @@
-[33mcommit 12786b50bd874330042b4240e668d1f4d80113b3[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m)[m
-Author: fabertleury <fabert_@hotmail.com>
-Date:   Wed Apr 2 22:39:50 2025 -0300
-
-    Remover processadores de pagamento e pedidos do serviço principal
