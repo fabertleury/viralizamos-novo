@@ -17,6 +17,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { createClient } from '@/lib/supabase/client';
 import { ProfileVerificationModal } from '@/components/modals/ProfileVerificationModal';
+import { normalizeInstagramUsername } from '@/app/checkout/instagram-v2/utils/instagram-username';
 
 interface ServiceDetail {
   title: string;
@@ -439,7 +440,31 @@ export function InstagramStep1({
       return;
     }
 
-    await checkProfile(formData.instagram_username);
+    // Normaliza o nome de usuário
+    const normalizedUsername = normalizeInstagramUsername(formData.instagram_username);
+    if (normalizedUsername === 'post_link') {
+      toast.error('Por favor, insira o link do perfil do Instagram e não o link de um post ou reel');
+      return;
+    }
+    if (!normalizedUsername) {
+      toast.error('Nome de usuário do Instagram inválido');
+      return;
+    }
+
+    await checkProfile(normalizedUsername);
+  };
+
+  const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const normalizedUsername = normalizeInstagramUsername(e.target.value);
+    if (normalizedUsername === 'post_link') {
+      toast.error('Por favor, insira o link do perfil do Instagram e não o link de um post ou reel');
+      return;
+    }
+    if (normalizedUsername) {
+      setUsername(normalizedUsername);
+    } else {
+      setUsername(e.target.value);
+    }
   };
 
   // Função para renderizar o ícone do serviço
@@ -632,7 +657,7 @@ export function InstagramStep1({
                       type="text" 
                       id="instagram_username_mobile"
                       value={username}
-                      onChange={(e) => setUsername(e.target.value)}
+                      onChange={handleUsernameChange}
                       placeholder="seuperfil" 
                       className="pl-8 w-full py-3 border-2 border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 rounded-lg"
                     />
@@ -762,7 +787,9 @@ export function InstagramStep1({
                       id="instagram_username"
                       placeholder="seuperfil" 
                       className="pl-8 w-full py-3 border-2 border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 rounded-lg"
-                      {...register('instagram_username')}
+                      {...register('instagram_username', {
+                        onChange: handleUsernameChange
+                      })}
                     />
                   </div>
                   {errors.instagram_username && (
