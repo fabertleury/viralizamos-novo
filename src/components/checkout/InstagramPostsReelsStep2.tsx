@@ -39,7 +39,7 @@ interface Service {
   preco: number;
   quantidade: number;
   provider_id: string;
-  service_variations?: Array<Record<string, unknown>>; // Adicionando a propriedade service_variations como opcional
+  service_variations?: Array<Record<string, unknown>>; // Adiccionando a propriedade service_variations como opcional
 }
 
 interface Post {

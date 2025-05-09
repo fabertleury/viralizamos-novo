@@ -83,6 +83,7 @@ export function InstagramStep1({
   const [loadingStage, setLoadingStage] = useState<'loading' | 'error' | 'done'>('loading');
   const [service, setService] = useState<Service | null>(null);
   const [loadingStageService, setLoadingStageService] = useState<'searching' | 'checking' | 'loading' | 'done' | 'error'>('searching');
+  const [formError, setFormError] = useState<string | null>(null);
 
   const router = useRouter();
   const { fetchInstagramProfileInfo } = useInstagramAPI();
@@ -430,24 +431,25 @@ export function InstagramStep1({
   };
 
   const onSubmit = async (formData: FormData) => {
+    setFormError(null);
     if (!formData.is_public_confirmed) {
       toast.error('Confirme que seu perfil é público');
       return;
     }
 
     if (!formData.instagram_username || formData.instagram_username.trim() === '') {
-      toast.error('Informe seu perfil do Instagram');
+      setFormError('Informe seu perfil do Instagram');
       return;
     }
 
     // Normaliza o nome de usuário
     const normalizedUsername = normalizeInstagramUsername(formData.instagram_username);
     if (normalizedUsername === 'post_link') {
-      toast.error('Por favor, insira o link do perfil do Instagram e não o link de um post ou reel');
+      setFormError('Por favor, insira o link do perfil do Instagram e não o link de um post ou reel');
       return;
     }
     if (!normalizedUsername) {
-      toast.error('Nome de usuário do Instagram inválido');
+      setFormError('Nome de usuário do Instagram inválido');
       return;
     }
 
@@ -455,9 +457,10 @@ export function InstagramStep1({
   };
 
   const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormError(null);
     const normalizedUsername = normalizeInstagramUsername(e.target.value);
     if (normalizedUsername === 'post_link') {
-      toast.error('Por favor, insira o link do perfil do Instagram e não o link de um post ou reel');
+      setFormError('Por favor, insira o link do perfil do Instagram e não o link de um post ou reel');
       return;
     }
     if (normalizedUsername) {
@@ -786,13 +789,21 @@ export function InstagramStep1({
                       type="text" 
                       id="instagram_username"
                       placeholder="seuperfil" 
-                      className="pl-8 w-full py-3 border-2 border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 rounded-lg"
+                      className={`pl-8 w-full py-3 border-2 ${formError ? 'border-red-500' : 'border-gray-300'} focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 rounded-lg`}
                       {...register('instagram_username', {
                         onChange: handleUsernameChange
                       })}
                     />
                   </div>
-                  {errors.instagram_username && (
+                  {formError && (
+                    <p className="text-red-500 text-sm mt-2 flex items-center space-x-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                      <span>{formError}</span>
+                    </p>
+                  )}
+                  {errors.instagram_username && !formError && (
                     <p className="text-red-500 text-sm mt-2 flex items-center space-x-2">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
