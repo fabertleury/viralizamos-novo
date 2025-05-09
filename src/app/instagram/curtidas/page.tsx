@@ -113,6 +113,42 @@ export default function CurtidasPage() {
     fetchServices();
   }, []);
 
+  // Reordenar os serviços na ordem desejada
+  const ordenarServicos = (servicos: Service[]) => {
+    // Cria uma cópia para não modificar o estado original
+    const servicosOrdenados = [...servicos];
+    
+    // Define a ordem de prioridade pelo nome
+    const ordemPrioridade = [
+      "Curtidas Brasileiras BR", 
+      "Curtidas Brasileiras PREMIUM", 
+      "Curtidas Mundiais"
+    ];
+    
+    // Ordena os serviços baseado na ordem de prioridade
+    servicosOrdenados.sort((a, b) => {
+      const indexA = ordemPrioridade.findIndex(nome => 
+        a.name.includes(nome));
+      const indexB = ordemPrioridade.findIndex(nome => 
+        b.name.includes(nome));
+      
+      // Se ambos os serviços não estiverem na lista de prioridade, manter a ordem original
+      if (indexA === -1 && indexB === -1) return 0;
+      
+      // Se apenas um deles estiver na lista, priorizar o que está
+      if (indexA === -1) return 1;
+      if (indexB === -1) return -1;
+      
+      // Se ambos estiverem na lista, ordenar conforme a prioridade
+      return indexA - indexB;
+    });
+    
+    return servicosOrdenados;
+  };
+
+  // Usar os serviços ordenados
+  const servicosOrdenados = ordenarServicos(services);
+
   useEffect(() => {
     const initialSelectedServices = services.reduce((acc, service) => {
       const minQuantity = Math.min(...service.quantidade_preco.map(variation => variation.quantidade));
@@ -219,7 +255,7 @@ export default function CurtidasPage() {
               ) : (
                 <div className="space-y-12">
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-                    {services.map((service) => (
+                    {servicosOrdenados.map((service) => (
                       <Card 
                         key={service.id} 
                         className="flex flex-col p-6 rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 ease-in-out relative"

@@ -161,7 +161,18 @@ export function InstagramPostsReelsStep2({ serviceType, title }: InstagramPostsR
   useEffect(() => {
     const newTotalSelected = selectedPosts.length + selectedReels.length;
     setTotalSelectedItems(newTotalSelected);
-  }, [selectedPosts, selectedReels]);
+    
+    // Rolar para a seção de pagamento quando atingir o máximo de itens no mobile
+    if (isMobile && newTotalSelected === maxTotalItems) {
+      setTimeout(() => {
+        paymentSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
+        toast.success(`Ótimo! Você selecionou ${maxTotalItems} itens. Agora preencha seus dados para finalizar.`, {
+          position: 'bottom-center',
+          duration: 4000
+        });
+      }, 500);
+    }
+  }, [selectedPosts, selectedReels, isMobile, maxTotalItems]);
   
   const supabase = createClient();
 
@@ -2009,12 +2020,20 @@ export function InstagramPostsReelsStep2({ serviceType, title }: InstagramPostsR
               {/* Coluna 2: Informações do Pedido */}
               <div className="space-y-6 order-2 md:order-none" ref={paymentSectionRef}>
                 {/* Indicador de rolagem no mobile quando há itens selecionados */}
-                {selectedItemsCount > 0 && selectedItemsCount < maxTotalItems && isMobile && (
-                  <div className="fixed bottom-4 right-4 z-50 md:hidden animate-bounce bg-pink-500 text-white p-3 rounded-full shadow-lg"
-                    onClick={() => paymentSectionRef.current?.scrollIntoView({ behavior: 'smooth' })}>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                    </svg>
+                {selectedItemsCount > 0 && isMobile && (
+                  <div 
+                    className="fixed bottom-4 right-4 z-50 md:hidden bg-gradient-to-r from-purple-600 to-pink-600 text-white p-3 rounded-full shadow-lg flex items-center justify-center"
+                    onClick={() => paymentSectionRef.current?.scrollIntoView({ behavior: 'smooth' })}
+                    style={{ width: '60px', height: '60px' }}
+                  >
+                    <div className="relative">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                      </svg>
+                      <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                        {selectedItemsCount}
+                      </div>
+                    </div>
                   </div>
                 )}
 
