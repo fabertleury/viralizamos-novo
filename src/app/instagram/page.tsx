@@ -239,9 +239,12 @@ export default function InstagramPage() {
                           <p className="text-gray-600 text-sm mb-2 flex-grow">
                             {group.description}
                           </p>
-                          <p className="text-gray-600 text-sm mt-auto">
-                            {group.description}
-                          </p>
+                          <div className="flex items-center justify-center mt-2">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              <span className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></span>
+                              Online
+                            </span>
+                          </div>
                         </Card>
                       </Link>
                     ))}
