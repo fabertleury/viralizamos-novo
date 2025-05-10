@@ -244,15 +244,12 @@ export default function InstagramPage() {
                               // Contar o número total de serviços para esta categoria
                               const totalServices = group.subcategories.reduce((total, sub) => 
                                 total + (sub.services?.count || 0), 0);
-                              
                               if (totalServices > 0) {
                                 return totalServices > 1 
                                   ? `${totalServices} serviços disponíveis` 
-                                  : '1 serviço disponível';
+                                  : `${totalServices} serviço disponível`;
                               } else {
-                                return group.subcategories.length > 1 
-                                  ? `${group.subcategories.length} opções disponíveis` 
-                                  : '1 opção disponível';
+                                return 'Nenhum serviço disponível';
                               }
                             })()}
                           </p>
