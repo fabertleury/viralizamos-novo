@@ -269,6 +269,13 @@ export default function HomeV3() {
   const [showProfilePreviewModal, setShowProfilePreviewModal] = useState(false);
   const [profilePreviewData, setProfilePreviewData] = useState<any>(null);
 
+  const [error, setError] = useState<string | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [showProfilePreview, setShowProfilePreview] = useState(false);
+  const [profileData, setProfileData] = useState<any>(null);
+  const [showModal, setShowModal] = useState(false);
+  const supabase = createClient();
+
   // Função para continuar análise após visualizar preview
   const handleContinueAnalysis = () => {
     if (profilePreviewData) {
@@ -336,7 +343,6 @@ export default function HomeV3() {
     link: '',
     ativo: false
   });
-  const supabase = createClient();
 
   // Função para pegar o ícone correto baseado no nome
   const getIconComponent = (iconName: string) => {
@@ -598,78 +604,88 @@ export default function HomeV3() {
   };
 
   const checkProfile = async (usernameToCheck: string) => {
-    setIsLoading(true);
-    setError(null);
-    
     try {
-      console.log(`Verificando perfil: ${usernameToCheck}`);
-      
-      // Usar o graphql-check como verificador principal para aproveitar a rotação de APIs
-      const response = await fetch(`/api/instagram/graphql-check?username=${usernameToCheck}`);
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Erro ao verificar perfil');
-      }
-      
-      console.log('Resposta do graphql-check:', data);
-      console.log('Status do perfil:', data.is_private ? 'Privado' : 'Público');
-      console.log('API utilizada:', data.source || 'desconhecida');
-      
-      // Formatar os dados do perfil
-      const profileInfo = {
-        username: data.username,
-        full_name: data.full_name,
-        profile_pic_url: data.profile_pic_url,
-        follower_count: data.follower_count || data.edge_followed_by?.count || 0,
-        following_count: data.following_count || data.edge_follow?.count || 0,
-        media_count: data.media_count || data.edge_owner_to_timeline_media?.count || 0,
-        is_private: data.is_private,
-        is_verified: data.is_verified,
-        biography: data.biography || '',
-        source: data.source
-      };
-      
-      console.log('Dados do perfil formatados:', profileInfo);
-      setProfileData(profileInfo);
-      setShowModal(true);
-      
-      if (profileInfo.is_private) {
-        console.log('Perfil privado detectado. Exibindo modal de erro.');
-        toast.error('Este perfil é privado. Por favor, torne-o público para continuar.', {
-          position: 'bottom-center',
-          duration: 5000
-        });
+      setIsLoading(true);
+      setError(null);
+      setAnalysisResult(null);
+      setShowProfilePreview(false);
+
+      const { data: profileData, error: profileError } = await supabase
+        .from('instagram_profiles')
+        .select('*')
+        .eq('username', usernameToCheck)
+        .single();
+
+      if (profileError) {
+        console.error('Erro ao buscar perfil:', profileError);
+        setError('Erro ao buscar perfil. Por favor, tente novamente.');
         return;
       }
-      
-      // Perfil está público, redirecionar para a próxima etapa
-      console.log('Perfil público confirmado. Prosseguindo para a próxima etapa.');
-      
-      // Armazenar dados do perfil no localStorage para a próxima etapa
-      localStorage.setItem('checkoutProfileData', JSON.stringify({
-        profileData: profileInfo,
-        username: profileInfo.username,
-        full_name: profileInfo.full_name,
-        profile_pic_url: profileInfo.profile_pic_url,
-        follower_count: profileInfo.follower_count,
-        following_count: profileInfo.following_count,
-        media_count: profileInfo.media_count,
-        is_private: profileInfo.is_private,
-        is_verified: profileInfo.is_verified,
-        biography: profileInfo.biography
-      }));
-      
-      // Redirecionar para a página de serviços
-      router.push('/instagram');
-      
-    } catch (error: any) {
-      console.error('Erro ao verificar perfil:', error);
-      setError(error.message || 'Erro ao verificar perfil');
-      toast.error(error.message || 'Erro ao verificar perfil', {
-        position: 'bottom-center',
-        duration: 5000
+
+      if (profileData) {
+        setAnalysisResult({
+          username: profileData.username,
+          followers: profileData.followers_count,
+          following: profileData.following_count,
+          posts: profileData.posts_count,
+          profile_pic_url: profileData.profile_pic_url,
+          is_private: profileData.is_private,
+          is_verified: profileData.is_verified,
+          last_updated: profileData.updated_at
+        });
+        setShowProfilePreview(true);
+        return;
+      }
+
+      const { data: apiData, error: apiError } = await supabase.functions.invoke('check-instagram-profile', {
+        body: { username: usernameToCheck }
       });
+
+      if (apiError) {
+        console.error('Erro na API:', apiError);
+        setError('Erro ao verificar perfil. Por favor, tente novamente.');
+        return;
+      }
+
+      if (!apiData || !apiData.success) {
+        setError(apiData?.error || 'Erro ao verificar perfil. Por favor, tente novamente.');
+        return;
+      }
+
+      const profile = apiData.data;
+      setAnalysisResult({
+        username: profile.username,
+        followers: profile.followers_count,
+        following: profile.following_count,
+        posts: profile.posts_count,
+        profile_pic_url: profile.profile_pic_url,
+        is_private: profile.is_private,
+        is_verified: profile.is_verified,
+        last_updated: new Date().toISOString()
+      });
+
+      // Salvar no banco de dados
+      const { error: saveError } = await supabase
+        .from('instagram_profiles')
+        .upsert({
+          username: profile.username,
+          followers_count: profile.followers_count,
+          following_count: profile.following_count,
+          posts_count: profile.posts_count,
+          profile_pic_url: profile.profile_pic_url,
+          is_private: profile.is_private,
+          is_verified: profile.is_verified,
+          updated_at: new Date().toISOString()
+        });
+
+      if (saveError) {
+        console.error('Erro ao salvar perfil:', saveError);
+      }
+
+      setShowProfilePreview(true);
+    } catch (err) {
+      console.error('Erro ao verificar perfil:', err);
+      setError('Erro ao verificar perfil. Por favor, tente novamente.');
     } finally {
       setIsLoading(false);
     }
