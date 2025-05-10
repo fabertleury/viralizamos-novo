@@ -832,7 +832,7 @@ export default function HomeV3() {
                       href={social.active ? `/${social.url}` : '#'} 
                       className="btn-choose"
                     >
-                      Turbine Agora
+                      COMPRAR AGORA
                     </a>
                   </div>
                 </div>
