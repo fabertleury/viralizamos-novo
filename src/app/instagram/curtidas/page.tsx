@@ -115,35 +115,16 @@ export default function CurtidasPage() {
 
   // Reordenar os serviços na ordem desejada
   const ordenarServicos = (servicos: Service[]) => {
-    // Cria uma cópia para não modificar o estado original
-    const servicosOrdenados = [...servicos];
-    
-    // Define a ordem de prioridade pelo nome
-    const ordemPrioridade = [
-      "Curtidas Brasileiras BR", 
-      "Curtidas Brasileiras PREMIUM", 
-      "Curtidas Mundiais"
-    ];
-    
-    // Ordena os serviços baseado na ordem de prioridade
-    servicosOrdenados.sort((a, b) => {
-      const indexA = ordemPrioridade.findIndex(nome => 
-        a.name.toLowerCase().includes(nome.toLowerCase()));
-      const indexB = ordemPrioridade.findIndex(nome => 
-        b.name.toLowerCase().includes(nome.toLowerCase()));
-      
-      // Se ambos os serviços não estiverem na lista de prioridade, manter a ordem original
-      if (indexA === -1 && indexB === -1) return 0;
-      
-      // Se apenas um deles estiver na lista, priorizar o que está
-      if (indexA === -1) return 1;
-      if (indexB === -1) return -1;
-      
-      // Se ambos estiverem na lista, ordenar conforme a prioridade
-      return indexA - indexB;
+    return [...servicos].sort((a, b) => {
+      const getOrder = (name: string) => {
+        const lower = name.toLowerCase();
+        if (lower.includes('brasileiras') && lower.includes('premium')) return 2;
+        if (lower.includes('brasileiras')) return 1;
+        if (lower.includes('mundiais')) return 3;
+        return 99;
+      };
+      return getOrder(a.name) - getOrder(b.name);
     });
-    
-    return servicosOrdenados;
   };
 
   // Usar os serviços ordenados
