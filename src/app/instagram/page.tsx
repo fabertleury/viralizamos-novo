@@ -314,7 +314,9 @@ export default function InstagramPage() {
                         href={`/instagram/${group.slug}`}
                         className="transform transition-all duration-200 hover:scale-105 h-full"
                       >
-                        <Card className="p-6 cursor-pointer bg-white hover:shadow-lg transition-shadow duration-200 h-full flex flex-col">
+                        <Card className="p-6 cursor-pointer bg-white hover:shadow-lg transition-shadow duration-200 h-full flex flex-col relative">
+                          {/* Bolinha verde de status online */}
+                          <span className="absolute top-3 right-3 w-3 h-3 bg-green-500 rounded-full shadow-md animate-pulse border-2 border-white z-10" title="Serviço online"></span>
                           <div className="flex items-center gap-4 mb-4">
                             <div className="p-3 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white">
                               {group.icon}
