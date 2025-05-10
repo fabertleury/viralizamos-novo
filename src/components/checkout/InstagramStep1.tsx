@@ -470,6 +470,36 @@ export function InstagramStep1({
     }
   };
 
+  const handleAnalyze = async () => {
+    if (!username) {
+      toast.error('Por favor, insira um nome de usuário do Instagram', {
+        position: 'bottom-center',
+        duration: 5000
+      });
+      return;
+    }
+
+    // Verificar se é um link de post ou reel
+    if (username.includes('/p/') || username.includes('/reel/')) {
+      toast.error('Por favor, insira o link do perfil do Instagram, não de um post ou reel', {
+        position: 'bottom-center',
+        duration: 5000
+      });
+      return;
+    }
+
+    // Extrair o nome de usuário do link se for um link de perfil
+    let usernameToCheck = username;
+    if (username.includes('instagram.com/')) {
+      usernameToCheck = username.split('instagram.com/')[1].split('/')[0].split('?')[0];
+    }
+
+    // Remover @ se presente
+    usernameToCheck = usernameToCheck.replace('@', '');
+
+    await checkProfile(usernameToCheck);
+  };
+
   // Função para renderizar o ícone do serviço
   const renderServiceIcon = () => {
     if (serviceIcon) {
@@ -660,9 +690,9 @@ export function InstagramStep1({
                       type="text" 
                       id="instagram_username_mobile"
                       value={username}
-                      onChange={handleUsernameChange}
-                      placeholder="seuperfil" 
-                      className="pl-8 w-full py-3 border-2 border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 rounded-lg"
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="Digite seu @ do Instagram"
+                      className="w-full px-6 py-4 rounded-full border-2 border-gray-300 focus:border-[#C43582] focus:outline-none text-lg"
                     />
                   </div>
                 </div>
@@ -684,23 +714,11 @@ export function InstagramStep1({
 
                 <button 
                   type="button" 
-                  onClick={() => {
-                    if (!username.trim()) {
-                      toast.error('Informe seu perfil do Instagram');
-                      return;
-                    }
-                    
-                    if (!isPublicConfirmed) {
-                      toast.error('Confirme que seu perfil é público');
-                      return;
-                    }
-                    
-                    checkProfile(username);
-                  }}
+                  onClick={handleAnalyze}
                   className="w-full py-3 text-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 transition-all duration-300 ease-in-out transform hover:scale-105"
                   disabled={isLoading}
                 >
-                  {isLoading ? 'Verificando...' : 'Verificar Perfil'}
+                  {isLoading ? 'Analisando...' : 'Analisar Perfil'}
                 </button>
               </div>
             </div>
@@ -770,6 +788,13 @@ export function InstagramStep1({
               </div>
             </div>
           </div>
+
+          {/* Mensagem de Erro */}
+          {error && (
+            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
+              {error}
+            </div>
+          )}
 
           {/* Formulário de Verificação (Desktop) */}
           <div className="hidden sm:block">

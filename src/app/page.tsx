@@ -599,89 +599,110 @@ export default function HomeV3() {
 
   const checkProfile = async (usernameToCheck: string) => {
     setIsLoading(true);
-    setShowPrivateMessage(false);
-    setShowProfilePreviewModal(true);
-    setTimer(30); // Reiniciar o timer para 30 segundos
-
+    setError(null);
+    
     try {
       console.log(`Verificando perfil: ${usernameToCheck}`);
-
+      
       // Usar o graphql-check como verificador principal para aproveitar a rotação de APIs
       const response = await fetch(`/api/instagram/graphql-check?username=${usernameToCheck}`);
       const data = await response.json();
-
+      
       if (!response.ok) {
         throw new Error(data.message || 'Erro ao verificar perfil');
       }
       
       console.log('Resposta do graphql-check:', data);
       console.log('Status do perfil:', data.is_private ? 'Privado' : 'Público');
+      console.log('API utilizada:', data.source || 'desconhecida');
       
-      // Se o perfil for público, redirecionar para /analisar-perfil
-      if (!data.is_private) {
-        router.push(`/analisar-perfil?username=${usernameToCheck}`);
-        return;
-      }
-
       // Formatar os dados do perfil
       const profileInfo = {
         username: data.username,
         full_name: data.full_name,
         profile_pic_url: data.profile_pic_url,
-        follower_count: data.follower_count,
-        following_count: data.following_count,
-        totalPosts: data.media_count || data.totalPosts || 0,
+        follower_count: data.follower_count || data.edge_followed_by?.count || 0,
+        following_count: data.following_count || data.edge_follow?.count || 0,
+        media_count: data.media_count || data.edge_owner_to_timeline_media?.count || 0,
         is_private: data.is_private,
         is_verified: data.is_verified,
         biography: data.biography || '',
-        followers: data.follower_count,
-        following: data.following_count,
         source: data.source
       };
       
-      console.log('Dados formatados do perfil:', profileInfo);
-
-      // Atualizar o estado do modal com todos os dados
-      setProfilePreviewData(profileInfo);
-
+      console.log('Dados do perfil formatados:', profileInfo);
+      setProfileData(profileInfo);
+      setShowModal(true);
+      
       if (profileInfo.is_private) {
-        // Iniciar o timer para o botão de "Já coloquei público"
-        setTimer(30);
+        console.log('Perfil privado detectado. Exibindo modal de erro.');
+        toast.error('Este perfil é privado. Por favor, torne-o público para continuar.', {
+          position: 'bottom-center',
+          duration: 5000
+        });
         return;
       }
-
-      // Se o perfil não for privado, continuar com a análise
-      handleContinueAnalysis();
+      
+      // Perfil está público, redirecionar para a próxima etapa
+      console.log('Perfil público confirmado. Prosseguindo para a próxima etapa.');
+      
+      // Armazenar dados do perfil no localStorage para a próxima etapa
+      localStorage.setItem('checkoutProfileData', JSON.stringify({
+        profileData: profileInfo,
+        username: profileInfo.username,
+        full_name: profileInfo.full_name,
+        profile_pic_url: profileInfo.profile_pic_url,
+        follower_count: profileInfo.follower_count,
+        following_count: profileInfo.following_count,
+        media_count: profileInfo.media_count,
+        is_private: profileInfo.is_private,
+        is_verified: profileInfo.is_verified,
+        biography: profileInfo.biography
+      }));
+      
+      // Redirecionar para a página de serviços
+      router.push('/instagram');
+      
     } catch (error: any) {
       console.error('Erro ao verificar perfil:', error);
-      toast.error('Erro ao verificar perfil. Tente novamente.');
+      setError(error.message || 'Erro ao verificar perfil');
+      toast.error(error.message || 'Erro ao verificar perfil', {
+        position: 'bottom-center',
+        duration: 5000
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleAnalyze = async () => {
-    // Remover @ do início do username, se existir
-    const cleanUsername = username.replace(/^@/, '').trim().toLowerCase();
-
-    if (!cleanUsername) {
-      toast.error('Por favor, insira um nome de usuário válido');
+    if (!username) {
+      toast.error('Por favor, insira um nome de usuário do Instagram', {
+        position: 'bottom-center',
+        duration: 5000
+      });
       return;
     }
 
-    setIsLoading(true);
-    setShowPrivateMessage(false);
-
-    try {
-      // Chamar a função checkProfile para verificar o perfil
-      await checkProfile(cleanUsername);
-    } catch (error) {
-      console.error('Erro ao validar perfil:', error);
-      toast.error('Erro ao validar perfil. Tente novamente.');
-      setShowPrivateMessage(false);
-    } finally {
-      setIsLoading(false);
+    // Verificar se é um link de post ou reel
+    if (username.includes('/p/') || username.includes('/reel/')) {
+      toast.error('Por favor, insira o link do perfil do Instagram, não de um post ou reel', {
+        position: 'bottom-center',
+        duration: 5000
+      });
+      return;
     }
+
+    // Extrair o nome de usuário do link se for um link de perfil
+    let usernameToCheck = username;
+    if (username.includes('instagram.com/')) {
+      usernameToCheck = username.split('instagram.com/')[1].split('/')[0].split('?')[0];
+    }
+
+    // Remover @ se presente
+    usernameToCheck = usernameToCheck.replace('@', '');
+
+    await checkProfile(usernameToCheck);
   };
 
   return (
@@ -691,6 +712,49 @@ export default function HomeV3() {
         <Header />
         
         {renderProfilePreviewModal()}
+
+        <section className="relative py-20 bg-gradient-to-b from-white to-gray-100">
+          <div className="container mx-auto px-4">
+            <div className="max-w-3xl mx-auto text-center">
+              <h1 className="text-4xl md:text-5xl font-bold mb-6">
+                Aumente sua presença no Instagram
+              </h1>
+              <p className="text-xl text-gray-600 mb-8">
+                Cresça seu perfil com curtidas, seguidores e visualizações reais
+              </p>
+              
+              <div className="flex flex-col md:flex-row gap-4 justify-center items-center">
+                <div className="w-full md:w-96 relative">
+                  <input
+                    type="text"
+                    placeholder="Digite seu @ do Instagram"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="w-full px-6 py-4 rounded-full border-2 border-gray-300 focus:border-[#C43582] focus:outline-none text-lg"
+                  />
+                  {isLoading && (
+                    <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#C43582]"></div>
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={handleAnalyze}
+                  disabled={isLoading}
+                  className="w-full md:w-auto px-8 py-4 bg-[#C43582] text-white rounded-full text-lg font-bold hover:bg-[#a62c6c] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? 'Analisando...' : 'Analisar Perfil'}
+                </button>
+              </div>
+              
+              {error && (
+                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
+                  {error}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
 
         <section className="home-banner">
           <div className="container boxed">

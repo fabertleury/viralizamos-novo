@@ -25,10 +25,27 @@ export async function GET(request: NextRequest) {
 
   if (!username) {
     return NextResponse.json(
-      { message: 'Nome de usuário é obrigatório' },
+      { message: 'Nome de usuário não fornecido' },
       { status: 400 }
     );
   }
+
+  // Verificar se é um link de post ou reel
+  if (username.includes('/p/') || username.includes('/reel/')) {
+    return NextResponse.json(
+      { message: 'Por favor, insira o link do perfil do Instagram, não de um post ou reel' },
+      { status: 400 }
+    );
+  }
+
+  // Extrair o nome de usuário do link se for um link de perfil
+  let usernameToCheck = username;
+  if (username.includes('instagram.com/')) {
+    usernameToCheck = username.split('instagram.com/')[1].split('/')[0].split('?')[0];
+  }
+
+  // Remover @ se presente
+  usernameToCheck = usernameToCheck.replace('@', '');
 
   // Obter a ordem das APIs do Supabase
   let apiOrder: ApiOrder[] = [
