@@ -267,9 +267,11 @@ export default function InstagramPage() {
                             {group.description}
                           </p>
                           <div className="flex items-center justify-center mt-2 mb-4">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              <span className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></span>
-                              Online
+                            <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-sm">
+                              {group.name === 'Curtidas' && 'Turbine suas curtidas agora'}
+                              {group.name === 'Seguidores' && 'Ganhe seguidores agora'}
+                              {group.name === 'Visualizações' && 'Aumente suas views já'}
+                              {group.name === 'Comentários' && 'Impulsione sua interação já'}
                             </span>
                           </div>
                           <button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-3 px-6 rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all duration-200 transform hover:scale-105">
