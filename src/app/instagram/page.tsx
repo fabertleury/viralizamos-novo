@@ -272,6 +272,26 @@ export default function InstagramPage() {
   return (
     <>
       <Header />
+      {/* Banner de Prova Social */}
+      <motion.div
+        initial={{ opacity: 0, y: -30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, type: 'spring' }}
+        className="container mx-auto px-4 mt-6 mb-8"
+      >
+        <div className="relative bg-gradient-to-r from-purple-600 via-pink-500 to-yellow-400 rounded-xl shadow-lg p-5 text-center overflow-hidden">
+          <div className="absolute inset-0 bg-white opacity-10 animate-pulse pointer-events-none" style={{ zIndex: 1 }}></div>
+          <div className="relative z-10">
+            <div className="text-2xl md:text-3xl font-bold text-white flex items-center justify-center gap-2 mb-2 animate-bounce-slow">
+              <span role="img" aria-label="foguete">🚀</span>
+              Mais de <span className="text-yellow-300 drop-shadow">10.000</span> perfis já impulsionados com sucesso!
+            </div>
+            <div className="text-white text-lg md:text-xl font-medium opacity-90">
+              Junte-se a quem está crescendo de verdade no Instagram.
+            </div>
+          </div>
+        </div>
+      </motion.div>
       <main className="min-h-screen bg-gray-50 py-12">
         {/* Banner de destaque */}
         <div className="container mx-auto px-4 mb-12">
