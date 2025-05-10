@@ -147,7 +147,7 @@ export default function InstagramPage() {
     if (subcategories.length > 0 && Object.keys(viewers).length === 0) {
       const initial: { [key: string]: number } = {};
       subcategories.forEach(sub => {
-        initial[sub.slug] = Math.floor(Math.random() * 50) + 10; // 10 a 60
+        initial[sub.slug] = Math.floor(Math.random() * 43) + 38; // 38 a 80
       });
       setViewers(initial);
     }
@@ -160,8 +160,8 @@ export default function InstagramPage() {
         Object.keys(updated).forEach(slug => {
           const change = Math.floor(Math.random() * 7) - 3; // -3 a +3
           let newValue = updated[slug] + change;
-          if (newValue < 10) newValue = 10;
-          if (newValue > 60) newValue = 60;
+          if (newValue < 38) newValue = 38;
+          if (newValue > 80) newValue = 80;
           updated[slug] = newValue;
         });
         return updated;
@@ -307,7 +307,7 @@ export default function InstagramPage() {
                           </div>
                           {/* Contador animado de visualizações */}
                           <div className="flex items-center justify-center mt-2">
-                            <span className="text-xs text-gray-500 bg-gray-100 rounded-full px-3 py-1">
+                            <span className="text-sm font-semibold text-purple-700 bg-purple-50 rounded-full px-4 py-1 shadow-sm">
                               {viewers[group.slug] || 0} pessoas estão visualizando este serviço agora
                             </span>
                           </div>
