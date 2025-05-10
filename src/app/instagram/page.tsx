@@ -120,6 +120,14 @@ const getCategoryOrder = (slug: string): number => {
   return orderMap[slug] || 99; // Categorias não mapeadas vão para o final
 };
 
+// Definir ranges personalizados para cada categoria
+const viewersRanges: { [key: string]: [number, number] } = {
+  curtidas: [30, 60],
+  seguidores: [10, 40],
+  visualizacoes: [15, 50],
+  comentarios: [5, 25],
+};
+
 export default function InstagramPage() {
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -235,7 +243,8 @@ export default function InstagramPage() {
     if (groupedSubcategories.length > 0 && Object.keys(viewers).length === 0) {
       const initial: { [key: string]: number } = {};
       groupedSubcategories.forEach(group => {
-        initial[group.slug] = Math.floor(Math.random() * 43) + 38; // 38 a 80
+        const [min, max] = viewersRanges[group.slug] || [10, 40];
+        initial[group.slug] = Math.floor(Math.random() * (max - min + 1)) + min;
       });
       setViewers(initial);
     }
@@ -247,10 +256,11 @@ export default function InstagramPage() {
       setViewers(prev => {
         const updated: { [key: string]: number } = { ...prev };
         Object.keys(updated).forEach(slug => {
+          const [min, max] = viewersRanges[slug] || [10, 40];
           const change = Math.floor(Math.random() * 7) - 3; // -3 a +3
           let newValue = updated[slug] + change;
-          if (newValue < 38) newValue = 38;
-          if (newValue > 80) newValue = 80;
+          if (newValue < min) newValue = min;
+          if (newValue > max) newValue = max;
           updated[slug] = newValue;
         });
         return updated;
@@ -330,9 +340,15 @@ export default function InstagramPage() {
                           </p>
                           {/* Mensagem sutil de visualizações */}
                           <div className="flex items-center justify-center mt-4">
-                            <span className="text-xs text-gray-500 bg-purple-50 rounded-full px-3 py-1">
+                            <span className="text-xs text-gray-500">
                               👀 {viewers[group.slug] || 0} pessoas estão de olho nesse serviço
                             </span>
+                          </div>
+                          {/* Botão Comprar Agora */}
+                          <div className="flex items-center justify-center mt-2">
+                            <button className="px-6 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-sm shadow hover:from-purple-700 hover:to-pink-700 transition-all duration-200">
+                              Comprar Agora
+                            </button>
                           </div>
                         </Card>
                       </Link>
