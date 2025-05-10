@@ -124,6 +124,7 @@ export default function InstagramPage() {
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [onlineUsers, setOnlineUsers] = useState(30);
+  const [viewers, setViewers] = useState<{ [key: string]: number }>({});
   const supabase = createClient();
 
   // Simular contador de usuários online
@@ -139,6 +140,35 @@ export default function InstagramPage() {
     }, 2500);
     return () => clearInterval(interval);
   }, []);
+
+  // Simular visualizações por serviço
+  useEffect(() => {
+    // Inicializa viewers para cada serviço
+    if (subcategories.length > 0 && Object.keys(viewers).length === 0) {
+      const initial: { [key: string]: number } = {};
+      subcategories.forEach(sub => {
+        initial[sub.slug] = Math.floor(Math.random() * 50) + 10; // 10 a 60
+      });
+      setViewers(initial);
+    }
+  }, [subcategories]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setViewers(prev => {
+        const updated: { [key: string]: number } = { ...prev };
+        Object.keys(updated).forEach(slug => {
+          const change = Math.floor(Math.random() * 7) - 3; // -3 a +3
+          let newValue = updated[slug] + change;
+          if (newValue < 10) newValue = 10;
+          if (newValue > 60) newValue = 60;
+          updated[slug] = newValue;
+        });
+        return updated;
+      });
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [viewers]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -275,9 +305,12 @@ export default function InstagramPage() {
                               {group.name === 'Comentários' && 'Impulsione sua interação já'}
                             </span>
                           </div>
-                          <button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-3 px-6 rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all duration-200 transform hover:scale-105">
-                            COMPRAR AGORA
-                          </button>
+                          {/* Contador animado de visualizações */}
+                          <div className="flex items-center justify-center mt-2">
+                            <span className="text-xs text-gray-500 bg-gray-100 rounded-full px-3 py-1">
+                              {viewers[group.slug] || 0} pessoas estão visualizando este serviço agora
+                            </span>
+                          </div>
                         </Card>
                       </Link>
                     ))}
