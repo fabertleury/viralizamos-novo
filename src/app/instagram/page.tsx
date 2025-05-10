@@ -123,19 +123,20 @@ const getCategoryOrder = (slug: string): number => {
 export default function InstagramPage() {
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
-  const [onlineUsers, setOnlineUsers] = useState(0);
+  const [onlineUsers, setOnlineUsers] = useState(30);
   const supabase = createClient();
 
   // Simular contador de usuários online
   useEffect(() => {
     const interval = setInterval(() => {
       setOnlineUsers(prev => {
-        const change = Math.random() > 0.5 ? 1 : -1;
-        const newValue = prev + change;
-        return Math.max(5, Math.min(25, newValue)); // Mantém entre 5 e 25 usuários
+        const change = Math.floor(Math.random() * 7) - 3; // Variação de -3 a +3
+        let newValue = prev + change;
+        if (newValue < 30) newValue = 30;
+        if (newValue > 80) newValue = 80;
+        return newValue;
       });
-    }, 3000);
-
+    }, 2500);
     return () => clearInterval(interval);
   }, []);
 
