@@ -328,18 +328,10 @@ export default function InstagramPage() {
                           <p className="text-gray-600 text-sm mb-2 flex-grow">
                             {group.description}
                           </p>
-                          <div className="flex items-center justify-center mt-2 mb-4">
-                            <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-sm">
-                              {group.name === 'Curtidas' && 'Turbine suas curtidas agora'}
-                              {group.name === 'Seguidores' && 'Ganhe seguidores agora'}
-                              {group.name === 'Visualizações' && 'Aumente suas views já'}
-                              {group.name === 'Comentários' && 'Impulsione sua interação já'}
-                            </span>
-                          </div>
-                          {/* Contador animado de visualizações */}
-                          <div className="flex items-center justify-center mt-2">
-                            <span className="text-sm font-semibold text-purple-700 bg-purple-50 rounded-full px-4 py-1 shadow-sm">
-                              {viewers[group.slug] || 0} pessoas estão visualizando este serviço agora
+                          {/* Mensagem sutil de visualizações */}
+                          <div className="flex items-center justify-center mt-4">
+                            <span className="text-xs text-gray-500 bg-purple-50 rounded-full px-3 py-1">
+                              👀 {viewers[group.slug] || 0} pessoas estão de olho nesse serviço
                             </span>
                           </div>
                         </Card>
