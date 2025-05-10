@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Header } from '@/components/layout/header';
 import { Card } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/client';
-import { Heart, Eye, Users, MessageCircle } from 'lucide-react';
+import { Heart, Eye, Users, MessageCircle, Users as UsersIcon } from 'lucide-react';
 
 interface Subcategory {
   id: string;
@@ -122,7 +122,21 @@ const getCategoryOrder = (slug: string): number => {
 export default function InstagramPage() {
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [onlineUsers, setOnlineUsers] = useState(0);
   const supabase = createClient();
+
+  // Simular contador de usuários online
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setOnlineUsers(prev => {
+        const change = Math.random() > 0.5 ? 1 : -1;
+        const newValue = prev + change;
+        return Math.max(5, Math.min(25, newValue)); // Mantém entre 5 e 25 usuários
+      });
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -205,6 +219,18 @@ export default function InstagramPage() {
           </div>
         </div>
 
+        {/* Banner de Oferta por Tempo Limitado */}
+        <div className="container mx-auto px-4 mb-12">
+          <div className="bg-gradient-to-r from-yellow-400 to-orange-500 rounded-xl p-4 text-center shadow-lg">
+            <h3 className="text-2xl font-bold text-white mb-2">
+              OFERTA ESPECIAL POR TEMPO LIMITADO!
+            </h3>
+            <p className="text-white text-lg">
+              Ganhe 20% de desconto em todos os serviços. Válido apenas hoje!
+            </p>
+          </div>
+        </div>
+
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
             {loading ? (
@@ -239,12 +265,15 @@ export default function InstagramPage() {
                           <p className="text-gray-600 text-sm mb-2 flex-grow">
                             {group.description}
                           </p>
-                          <div className="flex items-center justify-center mt-2">
+                          <div className="flex items-center justify-center mt-2 mb-4">
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                               <span className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></span>
                               Online
                             </span>
                           </div>
+                          <button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-3 px-6 rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all duration-200 transform hover:scale-105">
+                            COMPRAR AGORA
+                          </button>
                         </Card>
                       </Link>
                     ))}
@@ -262,6 +291,98 @@ export default function InstagramPage() {
               </>
             )}
           </div>
+        </div>
+
+        {/* Seção de Depoimentos */}
+        <div className="container mx-auto px-4 mt-16 mb-16">
+          <h2 className="text-3xl font-bold text-center mb-8">O que nossos clientes dizem</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white p-6 rounded-xl shadow-lg">
+              <div className="flex items-center mb-4">
+                <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                  <span className="text-purple-600 font-bold">JD</span>
+                </div>
+                <div className="ml-4">
+                  <h4 className="font-semibold">João Dias</h4>
+                  <p className="text-sm text-gray-500">@joaodias</p>
+                </div>
+              </div>
+              <p className="text-gray-600">"Aumentei meus seguidores em 5k em apenas uma semana! O serviço é incrível e superou minhas expectativas."</p>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow-lg">
+              <div className="flex items-center mb-4">
+                <div className="w-12 h-12 bg-pink-100 rounded-full flex items-center justify-center">
+                  <span className="text-pink-600 font-bold">MS</span>
+                </div>
+                <div className="ml-4">
+                  <h4 className="font-semibold">Maria Silva</h4>
+                  <p className="text-sm text-gray-500">@mariasilva</p>
+                </div>
+              </div>
+              <p className="text-gray-600">"As curtidas e comentários aumentaram muito meu engajamento. Agora meu conteúdo está chegando a muito mais pessoas!"</p>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow-lg">
+              <div className="flex items-center mb-4">
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                  <span className="text-blue-600 font-bold">PL</span>
+                </div>
+                <div className="ml-4">
+                  <h4 className="font-semibold">Pedro Lima</h4>
+                  <p className="text-sm text-gray-500">@pedrolima</p>
+                </div>
+              </div>
+              <p className="text-gray-600">"Meus Reels estão bombando! As visualizações aumentaram 300% depois que comecei a usar o serviço."</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Preview de Resultados */}
+        <div className="container mx-auto px-4 mb-16">
+          <h2 className="text-3xl font-bold text-center mb-8">Veja os resultados</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="bg-white p-6 rounded-xl shadow-lg">
+              <h3 className="text-xl font-semibold mb-4">Antes</h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Seguidores</span>
+                  <span className="font-semibold">1.2k</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Curtidas por post</span>
+                  <span className="font-semibold">~50</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Comentários</span>
+                  <span className="font-semibold">~5</span>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow-lg">
+              <h3 className="text-xl font-semibold mb-4">Depois</h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Seguidores</span>
+                  <span className="font-semibold text-green-600">10.5k</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Curtidas por post</span>
+                  <span className="font-semibold text-green-600">~500</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Comentários</span>
+                  <span className="font-semibold text-green-600">~50</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Contador de Pessoas Online */}
+        <div className="fixed bottom-4 right-4 bg-white rounded-lg shadow-lg p-3 flex items-center gap-2">
+          <UsersIcon className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-medium">
+            <span className="text-green-500">{onlineUsers}</span> pessoas online
+          </span>
         </div>
       </main>
     </>
