@@ -240,18 +240,7 @@ export default function InstagramPage() {
                             {group.description}
                           </p>
                           <p className="text-gray-600 text-sm mt-auto">
-                            {(() => {
-                              // Contar o número total de serviços para esta categoria
-                              const totalServices = group.subcategories.reduce((total, sub) => 
-                                total + (sub.services?.count || 0), 0);
-                              if (totalServices > 0) {
-                                return totalServices > 1 
-                                  ? `${totalServices} serviços disponíveis` 
-                                  : `${totalServices} serviço disponível`;
-                              } else {
-                                return 'Nenhum serviço disponível';
-                              }
-                            })()}
+                            {group.description}
                           </p>
                         </Card>
                       </Link>
