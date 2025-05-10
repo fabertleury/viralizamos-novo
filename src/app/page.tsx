@@ -729,49 +729,6 @@ export default function HomeV3() {
         
         {renderProfilePreviewModal()}
 
-        <section className="relative py-20 bg-gradient-to-b from-white to-gray-100">
-          <div className="container mx-auto px-4">
-            <div className="max-w-3xl mx-auto text-center">
-              <h1 className="text-4xl md:text-5xl font-bold mb-6">
-                Aumente sua presença no Instagram
-              </h1>
-              <p className="text-xl text-gray-600 mb-8">
-                Cresça seu perfil com curtidas, seguidores e visualizações reais
-              </p>
-              
-              <div className="flex flex-col md:flex-row gap-4 justify-center items-center">
-                <div className="w-full md:w-96 relative">
-                  <input
-                    type="text"
-                    placeholder="Digite seu @ do Instagram"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="w-full px-6 py-4 rounded-full border-2 border-gray-300 focus:border-[#C43582] focus:outline-none text-lg"
-                  />
-                  {isLoading && (
-                    <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#C43582]"></div>
-                    </div>
-                  )}
-                </div>
-                <button
-                  onClick={handleAnalyze}
-                  disabled={isLoading}
-                  className="w-full md:w-auto px-8 py-4 bg-[#C43582] text-white rounded-full text-lg font-bold hover:bg-[#a62c6c] transition disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isLoading ? 'Analisando...' : 'Analisar Perfil'}
-                </button>
-              </div>
-              
-              {error && (
-                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
-                  {error}
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-
         <section className="home-banner">
           <div className="container boxed">
             <div className="row align-items-center">
