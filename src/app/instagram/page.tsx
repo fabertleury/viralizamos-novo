@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { Header } from '@/components/layout/header';
 import { Card } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/client';
-import { Heart, Eye, Users, MessageCircle, Users as UsersIcon } from 'lucide-react';
+import { Heart, Eye, Users, MessageCircle, Users as UsersIcon, ArrowRight } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface Subcategory {
   id: string;
@@ -338,42 +339,136 @@ export default function InstagramPage() {
 
         {/* Preview de Resultados */}
         <div className="container mx-auto px-4 mb-16">
-          <h2 className="text-3xl font-bold text-center mb-8">Veja os resultados</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="bg-white p-6 rounded-xl shadow-lg">
-              <h3 className="text-xl font-semibold mb-4">Antes</h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Seguidores</span>
-                  <span className="font-semibold">1.2k</span>
+          <h2 className="text-3xl font-bold text-center mb-8">Veja a transformação</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            {/* Antes */}
+            <motion.div 
+              initial={{ opacity: 0, x: -50 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5 }}
+              className="relative"
+            >
+              <div className="bg-white rounded-3xl shadow-xl overflow-hidden">
+                <div className="bg-gradient-to-r from-gray-800 to-gray-900 p-4 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-gray-600"></div>
+                  <div className="flex-1">
+                    <div className="h-3 w-24 bg-gray-600 rounded"></div>
+                    <div className="h-2 w-16 bg-gray-700 rounded mt-1"></div>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Curtidas por post</span>
-                  <span className="font-semibold">~50</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Comentários</span>
-                  <span className="font-semibold">~5</span>
+                <div className="p-4">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-full bg-gray-200"></div>
+                      <div className="flex-1">
+                        <div className="h-4 w-32 bg-gray-200 rounded"></div>
+                        <div className="h-3 w-24 bg-gray-100 rounded mt-1"></div>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="h-4 w-full bg-gray-200 rounded"></div>
+                      <div className="h-4 w-3/4 bg-gray-200 rounded"></div>
+                    </div>
+                    <div className="flex items-center gap-4 text-gray-400">
+                      <Heart className="w-5 h-5" />
+                      <MessageCircle className="w-5 h-5" />
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      <span className="font-semibold">50</span> curtidas
+                    </div>
+                  </div>
                 </div>
               </div>
+              <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 bg-white px-4 py-2 rounded-full shadow-lg">
+                <span className="text-gray-600 font-medium">Antes</span>
+              </div>
+            </motion.div>
+
+            {/* Seta de transição */}
+            <div className="hidden lg:flex justify-center">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.5 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.5 }}
+                className="w-16 h-16 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 flex items-center justify-center text-white"
+              >
+                <ArrowRight className="w-8 h-8" />
+              </motion.div>
             </div>
-            <div className="bg-white p-6 rounded-xl shadow-lg">
-              <h3 className="text-xl font-semibold mb-4">Depois</h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Seguidores</span>
-                  <span className="font-semibold text-green-600">10.5k</span>
+
+            {/* Depois */}
+            <motion.div 
+              initial={{ opacity: 0, x: 50 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5 }}
+              className="relative"
+            >
+              <div className="bg-white rounded-3xl shadow-xl overflow-hidden">
+                <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-4 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-white/20"></div>
+                  <div className="flex-1">
+                    <div className="h-3 w-24 bg-white/20 rounded"></div>
+                    <div className="h-2 w-16 bg-white/10 rounded mt-1"></div>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Curtidas por post</span>
-                  <span className="font-semibold text-green-600">~500</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Comentários</span>
-                  <span className="font-semibold text-green-600">~50</span>
+                <div className="p-4">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-r from-purple-600 to-pink-600"></div>
+                      <div className="flex-1">
+                        <div className="h-4 w-32 bg-gradient-to-r from-purple-600 to-pink-600 rounded"></div>
+                        <div className="h-3 w-24 bg-gradient-to-r from-purple-400 to-pink-400 rounded mt-1"></div>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="h-4 w-full bg-gradient-to-r from-purple-600 to-pink-600 rounded"></div>
+                      <div className="h-4 w-3/4 bg-gradient-to-r from-purple-500 to-pink-500 rounded"></div>
+                    </div>
+                    <div className="flex items-center gap-4 text-purple-600">
+                      <Heart className="w-5 h-5" />
+                      <MessageCircle className="w-5 h-5" />
+                    </div>
+                    <div className="text-sm text-purple-600">
+                      <span className="font-semibold">500</span> curtidas
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+              <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-2 rounded-full shadow-lg">
+                <span className="text-white font-medium">Depois</span>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Métricas */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="bg-white p-6 rounded-xl shadow-lg text-center"
+            >
+              <div className="text-4xl font-bold text-purple-600 mb-2">10x</div>
+              <div className="text-gray-600">mais engajamento</div>
+            </motion.div>
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+              className="bg-white p-6 rounded-xl shadow-lg text-center"
+            >
+              <div className="text-4xl font-bold text-purple-600 mb-2">500%</div>
+              <div className="text-gray-600">mais alcance</div>
+            </motion.div>
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.6 }}
+              className="bg-white p-6 rounded-xl shadow-lg text-center"
+            >
+              <div className="text-4xl font-bold text-purple-600 mb-2">24h</div>
+              <div className="text-gray-600">resultados visíveis</div>
+            </motion.div>
           </div>
         </div>
 
