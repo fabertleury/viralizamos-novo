@@ -128,9 +128,9 @@ export default function CurtidasPage() {
     // Ordena os serviços baseado na ordem de prioridade
     servicosOrdenados.sort((a, b) => {
       const indexA = ordemPrioridade.findIndex(nome => 
-        a.name.includes(nome));
+        a.name.toLowerCase().includes(nome.toLowerCase()));
       const indexB = ordemPrioridade.findIndex(nome => 
-        b.name.includes(nome));
+        b.name.toLowerCase().includes(nome.toLowerCase()));
       
       // Se ambos os serviços não estiverem na lista de prioridade, manter a ordem original
       if (indexA === -1 && indexB === -1) return 0;
