@@ -230,6 +230,35 @@ export default function InstagramPage() {
   const groupedSubcategories = groupSubcategoriesByCategory(subcategories)
     .sort((a, b) => getCategoryOrder(a.slug) - getCategoryOrder(b.slug));
 
+  // Inicializar viewers para cada categoria exibida
+  useEffect(() => {
+    if (groupedSubcategories.length > 0 && Object.keys(viewers).length === 0) {
+      const initial: { [key: string]: number } = {};
+      groupedSubcategories.forEach(group => {
+        initial[group.slug] = Math.floor(Math.random() * 43) + 38; // 38 a 80
+      });
+      setViewers(initial);
+    }
+  }, [groupedSubcategories]);
+
+  // Atualizar viewers animadamente
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setViewers(prev => {
+        const updated: { [key: string]: number } = { ...prev };
+        Object.keys(updated).forEach(slug => {
+          const change = Math.floor(Math.random() * 7) - 3; // -3 a +3
+          let newValue = updated[slug] + change;
+          if (newValue < 38) newValue = 38;
+          if (newValue > 80) newValue = 80;
+          updated[slug] = newValue;
+        });
+        return updated;
+      });
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [viewers]);
+
   return (
     <>
       <Header />
@@ -404,14 +433,6 @@ export default function InstagramPage() {
               <div className="text-gray-600">resultados visíveis</div>
             </motion.div>
           </div>
-        </div>
-
-        {/* Contador de Pessoas Online */}
-        <div className="fixed bottom-4 right-4 bg-white rounded-lg shadow-lg p-3 flex items-center gap-2">
-          <UsersIcon className="w-5 h-5 text-green-500" />
-          <span className="text-sm font-medium">
-            <span className="text-green-500">{onlineUsers}</span> pessoas online
-          </span>
         </div>
       </main>
     </>
