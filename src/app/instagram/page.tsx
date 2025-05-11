@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { Header } from '@/components/layout/header';
 import { Card } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/client';
-import { Heart, Eye, Users, MessageCircle, Users as UsersIcon, ArrowRight } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Heart, Eye, Users, MessageCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface Subcategory {
   id: string;
@@ -15,9 +15,7 @@ interface Subcategory {
   slug: string;
   icon?: string;
   category_id: string;
-  services?: {
-    count: number;
-  };
+  services?: { count: number };
 }
 
 // Mapeamento de categorias principais
@@ -95,7 +93,12 @@ const groupSubcategoriesByCategory = (subcategories: Subcategory[]) => {
       description: `Serviços de ${categorySlug}`
     };
 
-    const config = (categoryConfig as any)[categorySlug] || defaultConfig;
+    // Type guard para garantir que categorySlug é uma chave válida
+    function isCategoryKey(key: string): key is keyof typeof categoryConfig {
+      return key in categoryConfig;
+    }
+
+    const config = isCategoryKey(categorySlug) ? categoryConfig[categorySlug] : defaultConfig;
 
     return {
       slug: categorySlug,
@@ -128,26 +131,22 @@ const viewersRanges: { [key: string]: [number, number] } = {
   comentarios: [5, 25],
 };
 
+// Definir tipo para subcategoria recebida do Supabase
+interface SupabaseSubcategory {
+  id: string;
+  name: string;
+  description: string | null;
+  slug: string;
+  icon?: string;
+  category_id: string;
+  services: { count: number }[] | { count: number };
+}
+
 export default function InstagramPage() {
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
-  const [onlineUsers, setOnlineUsers] = useState(30);
   const [viewers, setViewers] = useState<{ [key: string]: number }>({});
   const supabase = createClient();
-
-  // Simular contador de usuários online
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setOnlineUsers(prev => {
-        const change = Math.floor(Math.random() * 7) - 3; // Variação de -3 a +3
-        let newValue = prev + change;
-        if (newValue < 30) newValue = 30;
-        if (newValue > 80) newValue = 80;
-        return newValue;
-      });
-    }, 2500);
-    return () => clearInterval(interval);
-  }, []);
 
   // Simular visualizações por serviço
   useEffect(() => {
@@ -204,7 +203,10 @@ export default function InstagramPage() {
         console.log('Todas as subcategorias:', allSubcategories);
         
         // Filtrar subcategorias relacionadas ao Instagram
-        const instagramSubcategories = allSubcategories.filter(sub => {
+        const instagramSubcategories = (allSubcategories as SupabaseSubcategory[]).map((sub) => ({
+          ...sub,
+          services: Array.isArray(sub.services) ? sub.services[0] : sub.services
+        })).filter(sub => {
           const name = sub.name.toLowerCase();
           return (
             name.includes('curtida') || 
@@ -223,7 +225,10 @@ export default function InstagramPage() {
         setSubcategories(
           instagramSubcategories.length > 0 
             ? instagramSubcategories 
-            : allSubcategories
+            : (allSubcategories as SupabaseSubcategory[]).map((sub) => ({
+                ...sub,
+                services: Array.isArray(sub.services) ? sub.services[0] : sub.services
+              }))
         );
       } catch (error) {
         console.error('Erro ao carregar subcategorias:', error);
@@ -329,7 +334,13 @@ export default function InstagramPage() {
                           <span className="absolute top-3 right-3 w-3 h-3 bg-green-500 rounded-full shadow-md animate-pulse border-2 border-white z-10" title="Serviço online"></span>
                           <div className="flex items-center gap-4 mb-4">
                             <div className={`p-3 rounded-full ${idx === 0 ? 'bg-gradient-to-r from-yellow-400 to-orange-400 animate-bounce' : 'bg-gradient-to-r from-purple-600 to-pink-600'} text-white`}>
-                              {idx === 0 ? <span className="inline-block"><svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" viewBox=\"0 0 24 24\" strokeWidth=\"1.5\" stroke=\"currentColor\" className=\"w-6 h-6 text-white\"><path strokeLinecap=\"round\" strokeLinejoin=\"round\" d=\"M12 17.25l6.16 3.24-1.18-6.88 5-4.87-6.91-1-3.09-6.26-3.09 6.26-6.91 1 5 4.87-1.18 6.88L12 17.25z\" /></svg></span> : group.icon}
+                              {idx === 0 ? (
+                                <span className="inline-block">
+                                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-white">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 17.25l6.16 3.24-1.18-6.88 5-4.87-6.91-1-3.09-6.26-3.09 6.26-6.91 1 5 4.87-1.18 6.88L12 17.25z" />
+                                  </svg>
+                                </span>
+                              ) : group.icon}
                             </div>
                             <h3 className="text-xl font-semibold text-gray-900">
                               {group.name}
