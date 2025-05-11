@@ -400,39 +400,6 @@ export default function InstagramPage() {
             </div>
           </div>
         </div>
-
-        {/* Métricas */}
-        <div className="container mx-auto px-4 mb-16">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16">
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              className="bg-white p-6 rounded-xl shadow-lg text-center"
-            >
-              <div className="text-4xl font-bold text-purple-600 mb-2">10x</div>
-              <div className="text-gray-600">mais engajamento</div>
-            </motion.div>
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.4 }}
-              className="bg-white p-6 rounded-xl shadow-lg text-center"
-            >
-              <div className="text-4xl font-bold text-purple-600 mb-2">500%</div>
-              <div className="text-gray-600">mais alcance</div>
-            </motion.div>
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.6 }}
-              className="bg-white p-6 rounded-xl shadow-lg text-center"
-            >
-              <div className="text-4xl font-bold text-purple-600 mb-2">24h</div>
-              <div className="text-gray-600">resultados visíveis</div>
-            </motion.div>
-          </div>
-        </div>
       </main>
     </>
   );
