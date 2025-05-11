@@ -272,29 +272,25 @@ export default function InstagramPage() {
   return (
     <>
       <Header />
-      {/* Banner de Prova Social (único banner no topo, responsivo) */}
+      {/* Banner de destaque revertido */}
       <motion.div
         initial={{ opacity: 0, y: -30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, type: 'spring' }}
-        className="container mx-auto px-2 sm:px-4 mt-4 mb-6"
+        className="container mx-auto px-4 mt-6 mb-8"
       >
-        <div className="relative bg-gradient-to-r from-purple-600 via-pink-500 to-yellow-400 rounded-xl shadow-lg p-3 sm:p-5 text-center overflow-hidden">
-          <div className="absolute inset-0 bg-white opacity-10 animate-pulse pointer-events-none" style={{ zIndex: 1 }}></div>
-          <div className="relative z-10 flex flex-col items-center justify-center gap-1 sm:gap-2">
-            <div className="flex flex-col items-center w-full">
-              <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-1" role="img" aria-label="foguete">🚀</span>
-              <span className="text-lg sm:text-2xl md:text-3xl font-bold text-white leading-tight">
-                Mais de <span className="text-yellow-300 drop-shadow text-xl sm:text-3xl md:text-4xl">10.000</span>
-                <br className="block sm:hidden" /> perfis já<br className="block sm:hidden" /> impulsionados com sucesso!
-              </span>
+        <div className="relative bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl overflow-hidden shadow-xl animate-gradient-x">
+          <div className="absolute inset-0 bg-black opacity-20"></div>
+          <div className="relative z-10 flex items-center justify-center p-12 text-center">
+            <div className="text-white max-w-2xl">
+              <h2 className="text-4xl md:text-5xl font-bold mb-6 flex items-center justify-center gap-2">
+                <span role='img' aria-label='foguete'>🚀</span>
+                SERVIÇOS PARA INSTAGRAM
+              </h2>
+              <p className="text-xl md:text-2xl mb-0">
+                Escolha o que você precisa para o seu perfil
+              </p>
             </div>
-            <span className="text-white text-base sm:text-lg md:text-xl font-medium opacity-90 mt-1 mb-1 block leading-snug">
-              Junte-se a quem está crescendo de verdade no Instagram.
-            </span>
-            <span className="text-white text-sm sm:text-base md:text-lg font-medium opacity-90 block leading-snug">
-              Escolha o que você precisa para o seu perfil:
-            </span>
           </div>
         </div>
       </motion.div>
@@ -316,18 +312,24 @@ export default function InstagramPage() {
               <>
                 {groupedSubcategories.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {groupedSubcategories.map((group) => (
+                    {groupedSubcategories.map((group, idx) => (
                       <Link 
                         key={group.slug} 
                         href={`/instagram/${group.slug}`}
                         className="transform transition-all duration-200 hover:scale-105 h-full"
                       >
-                        <Card className="p-6 cursor-pointer bg-white hover:shadow-lg transition-shadow duration-200 h-full flex flex-col relative">
+                        <Card className={`p-6 cursor-pointer bg-white hover:shadow-lg transition-shadow duration-200 h-full flex flex-col relative ${idx === 0 ? 'ring-2 ring-yellow-400 shadow-xl' : ''}`}>
+                          {/* Badge de Mais vendidos no primeiro card */}
+                          {idx === 0 && (
+                            <span className="absolute top-3 left-3 px-3 py-1 bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs font-bold rounded-full shadow-md z-20 animate-pulse">
+                              Mais vendidos
+                            </span>
+                          )}
                           {/* Bolinha verde de status online */}
                           <span className="absolute top-3 right-3 w-3 h-3 bg-green-500 rounded-full shadow-md animate-pulse border-2 border-white z-10" title="Serviço online"></span>
                           <div className="flex items-center gap-4 mb-4">
-                            <div className="p-3 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white">
-                              {group.icon}
+                            <div className={`p-3 rounded-full ${idx === 0 ? 'bg-gradient-to-r from-yellow-400 to-orange-400 animate-bounce' : 'bg-gradient-to-r from-purple-600 to-pink-600'} text-white`}>
+                              {idx === 0 ? <span className="inline-block"><svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" viewBox=\"0 0 24 24\" strokeWidth=\"1.5\" stroke=\"currentColor\" className=\"w-6 h-6 text-white\"><path strokeLinecap=\"round\" strokeLinejoin=\"round\" d=\"M12 17.25l6.16 3.24-1.18-6.88 5-4.87-6.91-1-3.09-6.26-3.09 6.26-6.91 1 5 4.87-1.18 6.88L12 17.25z\" /></svg></span> : group.icon}
                             </div>
                             <h3 className="text-xl font-semibold text-gray-900">
                               {group.name}
