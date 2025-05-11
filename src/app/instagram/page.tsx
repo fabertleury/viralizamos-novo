@@ -333,14 +333,8 @@ export default function InstagramPage() {
                           {/* Bolinha verde de status online */}
                           <span className="absolute top-3 right-3 w-3 h-3 bg-green-500 rounded-full shadow-md animate-pulse border-2 border-white z-10" title="Serviço online"></span>
                           <div className="flex items-center gap-4 mb-4">
-                            <div className={`p-3 rounded-full ${idx === 0 ? 'bg-gradient-to-r from-yellow-400 to-orange-400 animate-bounce' : 'bg-gradient-to-r from-purple-600 to-pink-600'} text-white`}>
-                              {idx === 0 ? (
-                                <span className="inline-block">
-                                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-white">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 17.25l6.16 3.24-1.18-6.88 5-4.87-6.91-1-3.09-6.26-3.09 6.26-6.91 1 5 4.87-1.18 6.88L12 17.25z" />
-                                  </svg>
-                                </span>
-                              ) : group.icon}
+                            <div className={`p-3 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white`}>
+                              {group.icon}
                             </div>
                             <h3 className="text-xl font-semibold text-gray-900">
                               {group.name}
