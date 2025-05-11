@@ -272,7 +272,7 @@ export default function InstagramPage() {
   return (
     <>
       <Header />
-      {/* Banner de Prova Social (único banner no topo) */}
+      {/* Banner de Prova Social (único banner no topo, responsivo) */}
       <motion.div
         initial={{ opacity: 0, y: -30 }}
         animate={{ opacity: 1, y: 0 }}
@@ -281,17 +281,20 @@ export default function InstagramPage() {
       >
         <div className="relative bg-gradient-to-r from-purple-600 via-pink-500 to-yellow-400 rounded-xl shadow-lg p-3 sm:p-5 text-center overflow-hidden">
           <div className="absolute inset-0 bg-white opacity-10 animate-pulse pointer-events-none" style={{ zIndex: 1 }}></div>
-          <div className="relative z-10">
-            <div className="text-lg sm:text-2xl md:text-3xl font-bold text-white flex items-center justify-center gap-1 sm:gap-2 mb-1 sm:mb-2 animate-bounce-slow">
-              <span role="img" aria-label="foguete">🚀</span>
-              Mais de <span className="text-yellow-300 drop-shadow">10.000</span> perfis já impulsionados com sucesso!
+          <div className="relative z-10 flex flex-col items-center justify-center gap-1 sm:gap-2">
+            <div className="flex flex-col items-center w-full">
+              <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-1" role="img" aria-label="foguete">🚀</span>
+              <span className="text-lg sm:text-2xl md:text-3xl font-bold text-white leading-tight">
+                Mais de <span className="text-yellow-300 drop-shadow text-xl sm:text-3xl md:text-4xl">10.000</span>
+                <br className="block sm:hidden" /> perfis já<br className="block sm:hidden" /> impulsionados com sucesso!
+              </span>
             </div>
-            <div className="text-white text-base sm:text-lg md:text-xl font-medium opacity-90 mb-1">
+            <span className="text-white text-base sm:text-lg md:text-xl font-medium opacity-90 mt-1 mb-1 block leading-snug">
               Junte-se a quem está crescendo de verdade no Instagram.
-            </div>
-            <div className="text-white text-sm sm:text-base md:text-lg font-medium opacity-90">
+            </span>
+            <span className="text-white text-sm sm:text-base md:text-lg font-medium opacity-90 block leading-snug">
               Escolha o que você precisa para o seu perfil:
-            </div>
+            </span>
           </div>
         </div>
       </motion.div>
