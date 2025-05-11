@@ -6,7 +6,7 @@ import { Header } from '@/components/layout/header';
 import { Card } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/client';
 import { Heart, Eye, Users, MessageCircle, Users as UsersIcon, ArrowRight } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface Subcategory {
   id: string;
@@ -292,6 +292,13 @@ export default function InstagramPage() {
           </div>
         </div>
       </motion.div>
+
+      {/* Slider de Depoimentos */}
+      <SliderDepoimentos />
+
+      {/* Feed animado de resultados recentes */}
+      <FeedResultadosRecentes />
+
       <main className="min-h-screen bg-gray-50 py-12">
         {/* Banner de destaque */}
         <div className="container mx-auto px-4 mb-12">
@@ -466,5 +473,103 @@ export default function InstagramPage() {
         </div>
       </main>
     </>
+  );
+}
+
+// Slider de depoimentos
+function SliderDepoimentos() {
+  const depoimentos = [
+    { nome: 'João Dias', user: '@joaodias', texto: 'Ganhei 2.000 seguidores em 1 semana! 🔥', cor: 'bg-purple-100', emoji: '🎉' },
+    { nome: 'Maria Silva', user: '@mariasilva', texto: 'Meu engajamento dobrou em poucos dias! 🙌', cor: 'bg-pink-100', emoji: '💖' },
+    { nome: 'Pedro Lima', user: '@pedrolima', texto: 'Meus Reels viralizaram, recomendo demais! 🚀', cor: 'bg-blue-100', emoji: '📈' },
+    { nome: 'Ana Souza', user: '@aninhafit', texto: 'Serviço rápido e seguro, amei o resultado! 😍', cor: 'bg-yellow-100', emoji: '⭐' },
+    { nome: 'Lucas Rocha', user: '@lucasrocha', texto: 'Mais de 5.000 curtidas em um post! 👏', cor: 'bg-green-100', emoji: '👍' },
+    { nome: 'Bruna Costa', user: '@brunacosta', texto: 'Atendimento top e resultado real! 💬', cor: 'bg-red-100', emoji: '💬' },
+    { nome: 'Rafa Gomes', user: '@rafagomes', texto: 'Ganhei seguidores reais, nada de bots! 🥇', cor: 'bg-indigo-100', emoji: '🤩' },
+    { nome: 'Carla Mendes', user: '@carlamendes', texto: 'Meu perfil nunca teve tanto alcance! 🌟', cor: 'bg-orange-100', emoji: '🌟' },
+  ];
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setIndex((prev) => (prev + 1) % depoimentos.length);
+    }, 3500);
+    return () => clearInterval(timer);
+  }, [depoimentos.length]);
+
+  return (
+    <div className="container mx-auto px-4 mb-8">
+      <div className="max-w-2xl mx-auto">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={index}
+            initial={{ opacity: 0, x: 40 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -40 }}
+            transition={{ duration: 0.5 }}
+            className="bg-white rounded-xl shadow-lg p-6 flex items-center gap-4 min-h-[110px]"
+          >
+            <div className={`w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold ${depoimentos[index].cor}`}>
+              {depoimentos[index].nome[0]}
+            </div>
+            <div>
+              <div className="font-semibold text-gray-800 flex items-center gap-2">
+                {depoimentos[index].nome} <span className="text-xs text-gray-400">{depoimentos[index].user}</span> {depoimentos[index].emoji}
+              </div>
+              <div className="text-gray-600 text-base mt-1">{depoimentos[index].texto}</div>
+            </div>
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+
+// Feed animado de resultados recentes
+function FeedResultadosRecentes() {
+  const resultados = [
+    '🔥 @joaodias ganhou 1.200 seguidores hoje',
+    '💥 @mariasilva teve 3.000 curtidas em um post',
+    '🚀 @pedrolima recebeu 50 comentários em 24h',
+    '✨ @aninhafit aumentou o alcance em 400%',
+    '🎯 @lucasrocha viralizou um Reels com 20k views',
+    '💬 @brunacosta recebeu 100 mensagens novas',
+    '📈 @rafagomes dobrou o engajamento em 7 dias',
+    '🌟 @carlamendes ganhou 800 seguidores em 2 dias',
+    '🔥 @joaodias teve 2.500 curtidas em um post',
+    '🚀 @mariasilva viralizou um story com 10k views',
+    '💥 @pedrolima ganhou 300 seguidores em 1 dia',
+    '✨ @aninhafit recebeu 40 comentários em um post',
+    '🎯 @lucasrocha teve 5.000 views em um Reels',
+    '💬 @brunacosta aumentou o alcance em 200%',
+    '📈 @rafagomes ganhou 1.000 seguidores em 3 dias',
+    '🌟 @carlamendes teve 1.500 curtidas em um post',
+  ];
+  const [current, setCurrent] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrent((prev) => (prev + 1) % resultados.length);
+    }, 2200);
+    return () => clearInterval(timer);
+  }, [resultados.length]);
+
+  return (
+    <div className="container mx-auto px-4 mb-12">
+      <div className="max-w-xl mx-auto bg-white rounded-xl shadow flex items-center gap-3 px-6 py-4 min-h-[60px]">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={current}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.4 }}
+            className="text-base md:text-lg text-gray-700 font-medium"
+          >
+            {resultados[current]}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    </div>
   );
 }
