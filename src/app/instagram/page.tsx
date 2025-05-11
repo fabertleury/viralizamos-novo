@@ -369,6 +369,27 @@ export default function InstagramPage() {
           </div>
         </div>
 
+        {/* Banner de Prova Social abaixo dos serviços */}
+        <div className="container mx-auto px-4 mt-12 mb-16">
+          <div className="relative bg-gradient-to-r from-purple-600 via-pink-500 to-yellow-400 rounded-xl shadow-lg p-6 text-center overflow-hidden">
+            <div className="absolute inset-0 bg-white opacity-10 animate-pulse pointer-events-none" style={{ zIndex: 1 }}></div>
+            <div className="relative z-10">
+              <div className="text-2xl md:text-3xl font-bold text-white flex items-center justify-center gap-2 mb-2">
+                <span role="img" aria-label="foguete">🚀</span>
+                Mais de <span className="text-yellow-300 drop-shadow">10.000</span> perfis já foram impulsionados com sucesso!
+              </div>
+              <div className="text-white text-lg md:text-xl font-medium opacity-90 mb-4">
+                Junte-se a quem está crescendo de verdade no Instagram
+              </div>
+              <Link href="/instagram/seguidores">
+                <button className="px-8 py-3 rounded-lg bg-white text-purple-700 font-bold text-lg shadow hover:bg-purple-100 transition-all duration-200">
+                  Compre seguidores agora
+                </button>
+              </Link>
+            </div>
+          </div>
+        </div>
+
         {/* Métricas */}
         <div className="container mx-auto px-4 mb-16">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16">
