@@ -122,7 +122,7 @@ const getCategoryOrder = (slug: string): number => {
 
 // Definir ranges personalizados para cada categoria
 const viewersRanges: { [key: string]: [number, number] } = {
-  curtidas: [30, 60],
+  curtidas: [50, 90],
   seguidores: [10, 40],
   visualizacoes: [15, 50],
   comentarios: [5, 25],
@@ -272,51 +272,31 @@ export default function InstagramPage() {
   return (
     <>
       <Header />
-      {/* Banner de Prova Social */}
+      {/* Banner de Prova Social (único banner no topo) */}
       <motion.div
         initial={{ opacity: 0, y: -30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, type: 'spring' }}
-        className="container mx-auto px-4 mt-6 mb-8"
+        className="container mx-auto px-2 sm:px-4 mt-4 mb-6"
       >
-        <div className="relative bg-gradient-to-r from-purple-600 via-pink-500 to-yellow-400 rounded-xl shadow-lg p-5 text-center overflow-hidden">
+        <div className="relative bg-gradient-to-r from-purple-600 via-pink-500 to-yellow-400 rounded-xl shadow-lg p-3 sm:p-5 text-center overflow-hidden">
           <div className="absolute inset-0 bg-white opacity-10 animate-pulse pointer-events-none" style={{ zIndex: 1 }}></div>
           <div className="relative z-10">
-            <div className="text-2xl md:text-3xl font-bold text-white flex items-center justify-center gap-2 mb-2 animate-bounce-slow">
+            <div className="text-lg sm:text-2xl md:text-3xl font-bold text-white flex items-center justify-center gap-1 sm:gap-2 mb-1 sm:mb-2 animate-bounce-slow">
               <span role="img" aria-label="foguete">🚀</span>
               Mais de <span className="text-yellow-300 drop-shadow">10.000</span> perfis já impulsionados com sucesso!
             </div>
-            <div className="text-white text-lg md:text-xl font-medium opacity-90">
+            <div className="text-white text-base sm:text-lg md:text-xl font-medium opacity-90 mb-1">
               Junte-se a quem está crescendo de verdade no Instagram.
+            </div>
+            <div className="text-white text-sm sm:text-base md:text-lg font-medium opacity-90">
+              Escolha o que você precisa para o seu perfil:
             </div>
           </div>
         </div>
       </motion.div>
 
-      {/* Slider de Depoimentos */}
-      <SliderDepoimentos />
-
-      {/* Feed animado de resultados recentes */}
-      <FeedResultadosRecentes />
-
       <main className="min-h-screen bg-gray-50 py-12">
-        {/* Banner de destaque */}
-        <div className="container mx-auto px-4 mb-12">
-          <div className="relative bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl overflow-hidden shadow-xl animate-gradient-x">
-            <div className="absolute inset-0 bg-black opacity-20"></div>
-            <div className="relative z-10 flex items-center justify-center p-12 text-center">
-              <div className="text-white max-w-2xl">
-                <h2 className="text-4xl md:text-5xl font-bold mb-6">
-                  Serviços para Instagram
-                </h2>
-                <p className="text-xl md:text-2xl mb-0">
-                  Escolha o que você precisa para o seu perfil
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
             {loading ? (
@@ -384,49 +364,6 @@ export default function InstagramPage() {
           </div>
         </div>
 
-        {/* Seção de Depoimentos */}
-        <div className="container mx-auto px-4 mt-16 mb-16">
-          <h2 className="text-3xl font-bold text-center mb-8">O que nossos clientes dizem</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white p-6 rounded-xl shadow-lg">
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                  <span className="text-purple-600 font-bold">JD</span>
-                </div>
-                <div className="ml-4">
-                  <h4 className="font-semibold">João Dias</h4>
-                  <p className="text-sm text-gray-500">@joaodias</p>
-                </div>
-              </div>
-              <p className="text-gray-600">"Aumentei meus seguidores em 5k em apenas uma semana! O serviço é incrível e superou minhas expectativas."</p>
-            </div>
-            <div className="bg-white p-6 rounded-xl shadow-lg">
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-pink-100 rounded-full flex items-center justify-center">
-                  <span className="text-pink-600 font-bold">MS</span>
-                </div>
-                <div className="ml-4">
-                  <h4 className="font-semibold">Maria Silva</h4>
-                  <p className="text-sm text-gray-500">@mariasilva</p>
-                </div>
-              </div>
-              <p className="text-gray-600">"As curtidas e comentários aumentaram muito meu engajamento. Agora meu conteúdo está chegando a muito mais pessoas!"</p>
-            </div>
-            <div className="bg-white p-6 rounded-xl shadow-lg">
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                  <span className="text-blue-600 font-bold">PL</span>
-                </div>
-                <div className="ml-4">
-                  <h4 className="font-semibold">Pedro Lima</h4>
-                  <p className="text-sm text-gray-500">@pedrolima</p>
-                </div>
-              </div>
-              <p className="text-gray-600">"Meus Reels estão bombando! As visualizações aumentaram 300% depois que comecei a usar o serviço."</p>
-            </div>
-          </div>
-        </div>
-
         {/* Métricas */}
         <div className="container mx-auto px-4 mb-16">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16">
@@ -461,103 +398,5 @@ export default function InstagramPage() {
         </div>
       </main>
     </>
-  );
-}
-
-// Slider de depoimentos
-function SliderDepoimentos() {
-  const depoimentos = [
-    { nome: 'João Dias', user: '@joaodias', texto: 'Ganhei 2.000 seguidores em 1 semana! 🔥', cor: 'bg-purple-100', emoji: '🎉' },
-    { nome: 'Maria Silva', user: '@mariasilva', texto: 'Meu engajamento dobrou em poucos dias! 🙌', cor: 'bg-pink-100', emoji: '💖' },
-    { nome: 'Pedro Lima', user: '@pedrolima', texto: 'Meus Reels viralizaram, recomendo demais! 🚀', cor: 'bg-blue-100', emoji: '📈' },
-    { nome: 'Ana Souza', user: '@aninhafit', texto: 'Serviço rápido e seguro, amei o resultado! 😍', cor: 'bg-yellow-100', emoji: '⭐' },
-    { nome: 'Lucas Rocha', user: '@lucasrocha', texto: 'Mais de 5.000 curtidas em um post! 👏', cor: 'bg-green-100', emoji: '👍' },
-    { nome: 'Bruna Costa', user: '@brunacosta', texto: 'Atendimento top e resultado real! 💬', cor: 'bg-red-100', emoji: '💬' },
-    { nome: 'Rafa Gomes', user: '@rafagomes', texto: 'Ganhei seguidores reais, nada de bots! 🥇', cor: 'bg-indigo-100', emoji: '🤩' },
-    { nome: 'Carla Mendes', user: '@carlamendes', texto: 'Meu perfil nunca teve tanto alcance! 🌟', cor: 'bg-orange-100', emoji: '🌟' },
-  ];
-  const [index, setIndex] = useState(0);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setIndex((prev) => (prev + 1) % depoimentos.length);
-    }, 3500);
-    return () => clearInterval(timer);
-  }, [depoimentos.length]);
-
-  return (
-    <div className="container mx-auto px-4 mb-8">
-      <div className="max-w-2xl mx-auto">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={index}
-            initial={{ opacity: 0, x: 40 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -40 }}
-            transition={{ duration: 0.5 }}
-            className="bg-white rounded-xl shadow-lg p-6 flex items-center gap-4 min-h-[110px]"
-          >
-            <div className={`w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold ${depoimentos[index].cor}`}>
-              {depoimentos[index].nome[0]}
-            </div>
-            <div>
-              <div className="font-semibold text-gray-800 flex items-center gap-2">
-                {depoimentos[index].nome} <span className="text-xs text-gray-400">{depoimentos[index].user}</span> {depoimentos[index].emoji}
-              </div>
-              <div className="text-gray-600 text-base mt-1">{depoimentos[index].texto}</div>
-            </div>
-          </motion.div>
-        </AnimatePresence>
-      </div>
-    </div>
-  );
-}
-
-// Feed animado de resultados recentes
-function FeedResultadosRecentes() {
-  const resultados = [
-    '🔥 @joaodias ganhou 1.200 seguidores hoje',
-    '💥 @mariasilva teve 3.000 curtidas em um post',
-    '🚀 @pedrolima recebeu 50 comentários em 24h',
-    '✨ @aninhafit aumentou o alcance em 400%',
-    '🎯 @lucasrocha viralizou um Reels com 20k views',
-    '💬 @brunacosta recebeu 100 mensagens novas',
-    '📈 @rafagomes dobrou o engajamento em 7 dias',
-    '🌟 @carlamendes ganhou 800 seguidores em 2 dias',
-    '🔥 @joaodias teve 2.500 curtidas em um post',
-    '🚀 @mariasilva viralizou um story com 10k views',
-    '💥 @pedrolima ganhou 300 seguidores em 1 dia',
-    '✨ @aninhafit recebeu 40 comentários em um post',
-    '🎯 @lucasrocha teve 5.000 views em um Reels',
-    '💬 @brunacosta aumentou o alcance em 200%',
-    '📈 @rafagomes ganhou 1.000 seguidores em 3 dias',
-    '🌟 @carlamendes teve 1.500 curtidas em um post',
-  ];
-  const [current, setCurrent] = useState(0);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrent((prev) => (prev + 1) % resultados.length);
-    }, 2200);
-    return () => clearInterval(timer);
-  }, [resultados.length]);
-
-  return (
-    <div className="container mx-auto px-4 mb-12">
-      <div className="max-w-xl mx-auto bg-white rounded-xl shadow flex items-center gap-3 px-6 py-4 min-h-[60px]">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={current}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.4 }}
-            className="text-base md:text-lg text-gray-700 font-medium"
-          >
-            {resultados[current]}
-          </motion.div>
-        </AnimatePresence>
-      </div>
-    </div>
   );
 }
