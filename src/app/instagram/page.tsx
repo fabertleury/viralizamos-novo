@@ -317,18 +317,6 @@ export default function InstagramPage() {
           </div>
         </div>
 
-        {/* Banner de Oferta por Tempo Limitado */}
-        <div className="container mx-auto px-4 mb-12">
-          <div className="bg-gradient-to-r from-yellow-400 to-orange-500 rounded-xl p-4 text-center shadow-lg">
-            <h3 className="text-2xl font-bold text-white mb-2">
-              OFERTA ESPECIAL POR TEMPO LIMITADO!
-            </h3>
-            <p className="text-white text-lg">
-              Ganhe 20% de desconto em todos os serviços. Válido apenas hoje!
-            </p>
-          </div>
-        </div>
-
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
             {loading ? (
