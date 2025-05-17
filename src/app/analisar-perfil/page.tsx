@@ -1,6 +1,4 @@
-'use client';
-
-import { useState, useEffect, useRef, Suspense } from 'react';
+'use client';import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useInstagramAPI } from '@/hooks/useInstagramAPI';
 import { toast } from 'sonner';
@@ -9,13 +7,10 @@ import { ProfileInput } from '@/components/profile-analyzer/ProfileInput';
 import { EngagementAnalysis } from '@/components/profile-analyzer/EngagementAnalysis';
 import { EngagementProjectionChart } from '@/components/profile-analyzer/EngagementProjectionChart';
 import { AdvancedMetrics } from '@/components/profile-analyzer/AdvancedMetrics';
-import { PDFShareButton } from '@/components/profile-analyzer/PDFShareButton';
 import { ShareReport } from '@/components/profile-analyzer/ShareReport';
 import { FaSpinner, FaPlus, FaHeart, FaWhatsapp } from 'react-icons/fa';
 import { Header } from '@/components/layout/header';
-import Link from 'next/link';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Loader2 } from 'lucide-react';
+import Link from 'next/link';import { Loader2 } from 'lucide-react';
 
 interface ProfileData {
   username?: string;
@@ -791,21 +786,31 @@ function ProfileAnalyzerContent() {
                     href={`https://wa.me/?text=Confira%20a%20an%C3%A1lise%20do%20perfil%20${profileData.username}%20no%20Instagram%20com%20${profileData.followers_count?.toLocaleString()}%20seguidores%20-%20https%3A%2F%2Fviralizai.com`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center px-6 py-3 bg-green-500 text-white font-bold rounded-full hover:bg-green-600 transition-colors"
+                    className="inline-flex items-center px-6 py-3 bg-green-500 text-white font-bold rounded-full hover:bg-green-600 transition-colors mb-4"
                   >
                     <FaWhatsapp className="mr-2 text-xl" /> Compartilhar no WhatsApp
                   </a>
+                  
+                  {/* Botão de Compra de Seguidores com Tag de Promoção */}
+                  <div className="mt-6 relative">
+                    <div className="absolute -top-5 right-0 left-0 mx-auto w-max">
+                      <span className="bg-red-500 text-white text-sm font-bold py-1 px-3 rounded-full animate-pulse">
+                        PROMOÇÃO LIMITADA! 🔥
+                      </span>
+                    </div>
+                    <a
+                      href="https://viralizamos.com/instagram/seguidores"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-bold rounded-full hover:bg-blue-700 transition-colors transform hover:scale-105 shadow-lg"
+                    >
+                      <FaPlus className="mr-2 text-xl" /> Compre mais seguidores
+                    </a>
+                    <p className="text-sm text-gray-600 mt-2">
+                      Turbine seu perfil com seguidores reais e aumente seu alcance!
+                    </p>
+                  </div>
                 </div>
-              )}
-
-              {/* Compartilhamento de PDF */}
-              {profileData && contentData.length > 0 && (
-                <PDFShareButton 
-                  profileData={profileData}
-                  contentData={contentData}
-                  metrics={metrics}
-                  engagementProjection={engagementProjection}
-                />
               )}
 
               {/* Relatório de Compartilhamento */}

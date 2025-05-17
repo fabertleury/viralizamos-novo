@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 
@@ -36,7 +38,6 @@ const InstagramPostsCurtidasStep2 = () => {
   return (
     <div>
       <h1>Posts e Reels</h1>
-      <button onClick={() => fetchInstagramPosts()}>Carregar mais posts</button>
       {loading ? <p>Carregando...</p> : <ul>{instagramPosts.map(post => <li key={post.id}>{post.caption}</li>)}</ul>}
     </div>
   );

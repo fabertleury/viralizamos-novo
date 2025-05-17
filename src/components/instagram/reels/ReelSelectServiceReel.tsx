@@ -83,8 +83,6 @@ export default function ReelSelectServiceReel({
   const [hoveredReel, setHoveredReel] = useState<string | null>(null);
   const [reels, setReels] = useState<Post[]>(initialReels);
   const [loading, setLoading] = useState<boolean>(initialLoading);
-  const [nextMaxId, setNextMaxId] = useState<string>('');
-  const [hasMore, setHasMore] = useState<boolean>(true);
 
   const effectiveMaxSelectable = maxReels || maxSelectable || 5;
 
@@ -119,19 +117,16 @@ export default function ReelSelectServiceReel({
       if (response.data) {
         // Verificar se temos o novo formato de resposta com items
         let reelsData = [];
-        let nextMaxId = '';
         
         if (response.data.items && Array.isArray(response.data.items)) {
           console.log(`Recebidos ${response.data.items.length} itens do Instagram`);
           reelsData = response.data.items;
-          nextMaxId = response.data.next_max_id || '';
         } else if (Array.isArray(response.data)) {
           console.log(`Recebidos ${response.data.length} itens do Instagram`);
           reelsData = response.data;
         } else {
           console.error('Formato de resposta inesperado:', response.data);
           if (!nextId) setReels([]); // Limpar reels apenas se for primeira chamada
-          setHasMore(false);
           return;
         }
         
@@ -207,10 +202,6 @@ export default function ReelSelectServiceReel({
         // Atualizar o estado com os novos reels
         setReels(prevReels => nextId ? [...prevReels, ...normalizedReels] : normalizedReels);
         
-        // Atualizar o next_max_id para paginação
-        setNextMaxId(nextMaxId);
-        setHasMore(!!nextMaxId);
-        
         // Notificar o componente pai sobre os reels carregados
         if (onLoadReels) {
           onLoadReels(nextId ? [...reels, ...normalizedReels] : normalizedReels);
@@ -218,7 +209,6 @@ export default function ReelSelectServiceReel({
       } else {
         console.error('Formato de resposta inválido para reels:', response.data);
         if (!nextId) setReels([]); // Limpar reels apenas se for primeira chamada
-        setHasMore(false);
       }
     } catch (error) {
       console.error('Erro ao buscar reels:', error);
@@ -231,16 +221,8 @@ export default function ReelSelectServiceReel({
       
       toast.error('Erro ao carregar reels. Tente novamente.');
       if (!nextId) setReels([]); // Limpar reels apenas se for primeira chamada
-      setHasMore(false);
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Função para carregar mais reels
-  const handleLoadMore = () => {
-    if (!loading && hasMore && username) {
-      fetchReels(username, nextMaxId);
     }
   };
 
@@ -379,28 +361,6 @@ export default function ReelSelectServiceReel({
           </div>
         ))}
       </div>
-      
-      {/* Botão de carregar mais */}
-      {hasMore && (
-        <div className="flex justify-center mt-6">
-          <button
-            onClick={handleLoadMore}
-            disabled={loading}
-            className="px-4 py-2 bg-pink-100 hover:bg-pink-200 text-pink-800 rounded-md flex items-center justify-center transition-colors"
-          >
-            {loading ? (
-              <>
-                <span className="animate-spin mr-2">🔄</span>
-                Carregando...
-              </>
-            ) : (
-              <>
-                🔽 Carregar mais reels
-              </>
-            )}
-          </button>
-        </div>
-      )}
       
       {/* Aviso quando nenhum reel foi selecionado */}
       {reels.length > 0 && Object.keys(selected).length === 0 && (
