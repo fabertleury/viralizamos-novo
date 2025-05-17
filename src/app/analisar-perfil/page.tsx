@@ -783,7 +783,7 @@ function ProfileAnalyzerContent() {
                 <div className="max-w-3xl mx-auto bg-white rounded-lg shadow-lg p-6 mb-8 text-center">
                   <h3 className="text-xl font-bold mb-4">Compartilhar Análise</h3>
                   <a
-                    href={`https://wa.me/?text=Confira%20a%20an%C3%A1lise%20do%20perfil%20${profileData.username}%20no%20Instagram%20com%20${profileData.followers_count?.toLocaleString()}%20seguidores%20-%20https%3A%2F%2Fviralizai.com`}
+                    href={`https://wa.me/?text=🔍%20Olha%20só!%20Análise%20completa%20do%20perfil%20${profileData.username}%20com%20${profileData.followers_count?.toLocaleString()}%20seguidores!%20📊%0A%0A🚀%20Você%20também%20quer%20aumentar%20seus%20seguidores%20e%20curtidas?%0A%0A⭐%20Visite%20agora%20viralizamos.com%20e%20turbine%20seu%20Instagram%20com%20seguidores%20e%20curtidas%20reais!%20🔥`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center px-6 py-3 bg-green-500 text-white font-bold rounded-full hover:bg-green-600 transition-colors mb-4"
