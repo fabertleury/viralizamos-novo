@@ -1931,291 +1931,293 @@ export function InstagramPostsReelsStep2({ serviceType, title }: InstagramPostsR
               {/* Botões de "Carregar mais" para posts e reels */}
               {/* Removidos botões "CARREGAR MAIS POSTS" e "CARREGAR MAIS REELS" conforme solicitado */}
               
-              {/* Coluna 2: Informações do Pedido */}
-              <div className="space-y-6 order-2 md:order-none" ref={paymentSectionRef}>
-                {/* Indicador de rolagem no mobile quando há itens selecionados */}
-                {selectedItemsCount > 0 && isMobile && (
-                  <div 
-                    className="fixed bottom-4 right-4 z-50 md:hidden bg-gradient-to-r from-purple-600 to-pink-600 text-white p-3 rounded-full shadow-lg flex items-center justify-center"
-                    onClick={() => paymentSectionRef.current?.scrollIntoView({ behavior: 'smooth' })}
-                    style={{ width: '60px', height: '60px' }}
-                  >
-                    <div className="relative">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                    </svg>
-                      <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                        {selectedItemsCount}
-                      </div>
+            </Card>  
+            
+            {/* Coluna 2: Informações do Pedido */}
+            <div className="space-y-6 order-2 md:order-none" ref={paymentSectionRef}>
+              {/* Indicador de rolagem no mobile quando há itens selecionados */}
+              {selectedItemsCount > 0 && isMobile && (
+                <div 
+                  className="fixed bottom-4 right-4 z-50 md:hidden bg-gradient-to-r from-purple-600 to-pink-600 text-white p-3 rounded-full shadow-lg flex items-center justify-center"
+                  onClick={() => paymentSectionRef.current?.scrollIntoView({ behavior: 'smooth' })}
+                  style={{ width: '60px', height: '60px' }}
+                >
+                  <div className="relative">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                  </svg>
+                    <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                      {selectedItemsCount}
                     </div>
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* Verificando dados do serviço pelo console */}
-                {console.log('Renderizando Card de Informações do Pedido com serviço:', service, 'e valor final:', finalAmount)}
+              {/* Verificando dados do serviço pelo console */}
+              {console.log('Renderizando Card de Informações do Pedido com serviço:', service, 'e valor final:', finalAmount)}
 
-              <Card className="p-6">
-                  <h3 className="text-lg font-semibold mb-4">Informações do Pedido</h3>
-                  
-                <div className="space-y-4">
-                  <Input
-                    placeholder="Nome completo"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  />
-                  <Input
-                    placeholder="E-mail"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  />
-                  <Input
-                    placeholder="Telefone"
-                    value={maskPhone(formData.phone)}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D+/g, '') })}
-                  />
+            <Card className="p-6">
+                <h3 className="text-lg font-semibold mb-4">Informações do Pedido</h3>
+                
+              <div className="space-y-4">
+                <Input
+                  placeholder="Nome completo"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                />
+                <Input
+                  placeholder="E-mail"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                />
+                <Input
+                  placeholder="Telefone"
+                  value={maskPhone(formData.phone)}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D+/g, '') })}
+                />
+                </div>
+                
+                <div className="pt-4 mt-4 border-t space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Quantidade de {serviceType === 'curtidas' ? 'curtidas' : serviceType === 'visualizacao' || serviceType === 'reels' ? 'visualizações' : 'comentários'}:</span>
+                    <span>{service?.quantidade ? service.quantidade.toLocaleString() : '0'}</span>
                   </div>
                   
-                  <div className="pt-4 mt-4 border-t space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Quantidade de {serviceType === 'curtidas' ? 'curtidas' : serviceType === 'visualizacao' || serviceType === 'reels' ? 'visualizações' : 'comentários'}:</span>
-                      <span>{service?.quantidade ? service.quantidade.toLocaleString() : '0'}</span>
-                    </div>
-                    
-                    {selectedItemsCount > 0 && (
-                      <>
-                        {!hasUnevenDistribution ? (
-                          // Divisão exata
+                  {selectedItemsCount > 0 && (
+                    <>
+                      {!hasUnevenDistribution ? (
+                        // Divisão exata
+                        <div className="flex justify-between text-sm">
+                          <span>{serviceType === 'curtidas' ? 'Curtidas' : serviceType === 'visualizacao' || serviceType === 'reels' ? 'Visualizações' : 'Comentários'} por item:</span>
+                          <span>{baseQuantityPerItem.toLocaleString()}</span>
+                        </div>
+                      ) : (
+                        // Divisão com resto
+                        <div className="space-y-1">
                           <div className="flex justify-between text-sm">
                             <span>{serviceType === 'curtidas' ? 'Curtidas' : serviceType === 'visualizacao' || serviceType === 'reels' ? 'Visualizações' : 'Comentários'} por item:</span>
-                            <span>{baseQuantityPerItem.toLocaleString()}</span>
+                            <span className="font-semibold">Distribuição detalhada</span>
                           </div>
-                        ) : (
-                          // Divisão com resto
-                          <div className="space-y-1">
-                            <div className="flex justify-between text-sm">
-                              <span>{serviceType === 'curtidas' ? 'Curtidas' : serviceType === 'visualizacao' || serviceType === 'reels' ? 'Visualizações' : 'Comentários'} por item:</span>
-                              <span className="font-semibold">Distribuição detalhada</span>
-                            </div>
-                            {itemDistribution.map((quantity, index) => (
-                              <div key={index} className="flex justify-between text-xs pl-4">
-                                <span>Item {index + 1}:</span>
-                                <span>{quantity.toLocaleString()}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </>
-                    )}
-                    
-                    <div className="flex justify-between text-sm">
-                      <span>Itens selecionados:</span>
-                      <span>{selectedItemsCount} / {maxTotalItems}</span>
-                    </div>
-
-                    {/* Miniaturas dos itens selecionados */}
-                    {selectedItemsCount > 0 && (
-                      <div className="mt-3 pt-3 border-t">
-                        <p className="text-sm font-medium mb-1">Itens selecionados:</p>
-                        <div className="flex flex-wrap gap-0">
-                          {selectedPosts.map((post) => (
-                            <div key={`post-${post.id}`} className="relative w-12 h-12 rounded-sm overflow-hidden border border-pink-300 group m-0.5">
-                              <img 
-                                src={getProxiedImageUrl(post.image_url)} 
-                                alt="Post selecionado" 
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  if (!target.src.includes('placeholder-post.svg')) {
-                                    target.src = '/images/placeholder-post.svg';
-                                  }
-                                }}
-                              />
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
-                              <div className="absolute bottom-0 left-0 right-0 text-white text-[8px] bg-pink-500 text-center">
-                                Post
-                              </div>
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const updatedPosts = selectedPosts.filter(p => p.id !== post.id);
-                                  setSelectedPosts(updatedPosts);
-                                  handlePostSelect(updatedPosts);
-                                }}
-                                className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] 
-                                  shadow-md hover:bg-red-600"
-                                aria-label="Remover post"
-                              >
-                                ×
-                              </button>
-                            </div>
-                          ))}
-                          {selectedReels.map((reel) => (
-                            <div key={`reel-${reel.id}`} className="relative w-12 h-12 rounded-sm overflow-hidden border border-pink-300 group m-0.5">
-                              <img 
-                                src={getProxiedImageUrl(reel.image_url)} 
-                                alt="Reel selecionado" 
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  if (!target.src.includes('placeholder-reel.svg')) {
-                                    target.src = '/images/placeholder-reel.svg';
-                                  }
-                                }}
-                              />
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
-                              <div className="absolute bottom-0 left-0 right-0 text-white text-[8px] bg-purple-500 text-center">
-                                Reel
-                              </div>
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const updatedReels = selectedReels.filter(r => r.id !== reel.id);
-                                  setSelectedReels(updatedReels);
-                                  handleReelSelect(updatedReels);
-                                }}
-                                className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] 
-                                  shadow-md hover:bg-red-600"
-                                aria-label="Remover reel"
-                              >
-                                ×
-                              </button>
+                          {itemDistribution.map((quantity, index) => (
+                            <div key={index} className="flex justify-between text-xs pl-4">
+                              <span>Item {index + 1}:</span>
+                              <span>{quantity.toLocaleString()}</span>
                             </div>
                           ))}
                         </div>
-                      </div>
-                    )}
-
-                    {/* Mensagem explicativa sobre curtidas/visualizações */}
-                    <div className="mt-2 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
-                      {selectedItemsCount === 0 ? (
-                        <p>Selecione entre 1 e 5 posts/reels para distribuir o total de {serviceType === 'curtidas' ? 'curtidas' : serviceType === 'visualizacao' || serviceType === 'reels' ? 'visualizações' : 'comentários'}.</p>
-                      ) : selectedItemsCount === 1 ? (
-                        <p>Todas as {service?.quantidade ? service.quantidade.toLocaleString() : '0'} {serviceType === 'curtidas' ? 'curtidas' : serviceType === 'visualizacao' || serviceType === 'reels' ? 'visualizações' : 'comentários'} serão aplicadas no item selecionado.</p>
-                      ) : hasUnevenDistribution ? (
-                        <p>O total de {service?.quantidade ? service.quantidade.toLocaleString() : '0'} {serviceType === 'curtidas' ? 'curtidas' : serviceType === 'visualizacao' || serviceType === 'reels' ? 'visualizações' : 'comentários'} será distribuído entre os {selectedItemsCount} itens ({baseQuantityPerItem} por item + {remainderQuantity} extra{remainderQuantity > 1 ? 's' : ''} para o{remainderQuantity > 1 ? 's' : ''} primeiro{remainderQuantity > 1 ? 's' : ''}).</p>
-                      ) : (
-                        <p>O total de {service?.quantidade ? service.quantidade.toLocaleString() : '0'} {serviceType === 'curtidas' ? 'curtidas' : serviceType === 'visualizacao' || serviceType === 'reels' ? 'visualizações' : 'comentários'} será dividido igualmente ({baseQuantityPerItem} por item) entre os {selectedItemsCount} itens selecionados.</p>
                       )}
-                    </div>
+                    </>
+                  )}
+                  
+                  <div className="flex justify-between text-sm">
+                    <span>Itens selecionados:</span>
+                    <span>{selectedItemsCount} / {maxTotalItems}</span>
                   </div>
 
-                  {/* Parte de Valores/Preços */}
-                  <div className="mt-6 pt-4 border-t space-y-4">
-                    <div className="flex justify-between text-sm font-semibold">
-                      <span>Valor do serviço:</span>
-                      <span className="text-blue-600">R$ {service?.preco ? service.preco.toFixed(2).replace('.', ',') : '0,00'}</span>
-                    </div>
-                    
-                    <div className="flex justify-between text-lg font-semibold">
-                      <span>Valor total:</span>
-                      <span className="text-green-600">R$ {(finalAmount !== null ? finalAmount : (service?.preco || 0)).toFixed(2).replace('.', ',')}</span>
-                    </div>
-
-                    {discountAmount > 0 && (
-                      <div className="flex justify-between text-sm text-gray-600">
-                        <span>Valor original:</span>
-                        <span className="line-through">R$ {(service?.preco || 0).toFixed(2).replace('.', ',')}</span>
+                  {/* Miniaturas dos itens selecionados */}
+                  {selectedItemsCount > 0 && (
+                    <div className="mt-3 pt-3 border-t">
+                      <p className="text-sm font-medium mb-1">Itens selecionados:</p>
+                      <div className="flex flex-wrap gap-0">
+                        {selectedPosts.map((post) => (
+                          <div key={`post-${post.id}`} className="relative w-12 h-12 rounded-sm overflow-hidden border border-pink-300 group m-0.5">
+                            <img 
+                              src={getProxiedImageUrl(post.image_url)} 
+                              alt="Post selecionado" 
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                if (!target.src.includes('placeholder-post.svg')) {
+                                  target.src = '/images/placeholder-post.svg';
+                                }
+                              }}
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+                            <div className="absolute bottom-0 left-0 right-0 text-white text-[8px] bg-pink-500 text-center">
+                              Post
+                            </div>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const updatedPosts = selectedPosts.filter(p => p.id !== post.id);
+                                setSelectedPosts(updatedPosts);
+                                handlePostSelect(updatedPosts);
+                              }}
+                              className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] 
+                                shadow-md hover:bg-red-600"
+                              aria-label="Remover post"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                        {selectedReels.map((reel) => (
+                          <div key={`reel-${reel.id}`} className="relative w-12 h-12 rounded-sm overflow-hidden border border-pink-300 group m-0.5">
+                            <img 
+                              src={getProxiedImageUrl(reel.image_url)} 
+                              alt="Reel selecionado" 
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                if (!target.src.includes('placeholder-reel.svg')) {
+                                  target.src = '/images/placeholder-reel.svg';
+                                }
+                              }}
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+                            <div className="absolute bottom-0 left-0 right-0 text-white text-[8px] bg-purple-500 text-center">
+                              Reel
+                            </div>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const updatedReels = selectedReels.filter(r => r.id !== reel.id);
+                                setSelectedReels(updatedReels);
+                                handleReelSelect(updatedReels);
+                              }}
+                              className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] 
+                                shadow-md hover:bg-red-600"
+                              aria-label="Remover reel"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
-                  {/* Cupom e Botão de Pagamento */}
-                  <div className="space-y-4 pt-4 mt-4">
-                    <CouponInput 
-                      serviceId={service.id}
-                      originalAmount={service.preco}
-                      onCouponApplied={(discount, final, code) => {
-                        setDiscountAmount(discount);
-                        setFinalAmount(final);
-                        setAppliedCoupon(code || null);
-                      }}
-                    />
-                    
-                    <div className="flex items-center justify-center mt-4">
-                      <button 
-                        onClick={handleCheckout}
-                        disabled={loading || selectedItemsCount === 0 || !formData.name || !formData.email || !formData.phone}
-                        className={`
-                          px-6 py-3 rounded-full font-bold text-sm uppercase tracking-wider 
-                          transition-all duration-300 ease-in-out transform w-full
-                          ${loading || selectedItemsCount === 0 || !formData.name || !formData.email || !formData.phone
-                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                            : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:scale-105 hover:shadow-lg'}
-                        `}
-                      >
-                        {loading ? (
-                          <span className="flex items-center justify-center">
-                            <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                            Processando...
-                          </span>
-                        ) : (
-                          <span className="flex items-center justify-center">
-                            PAGAR COM PIX
-                          </span>
-                        )}
-                      </button>
+                  {/* Mensagem explicativa sobre curtidas/visualizações */}
+                  <div className="mt-2 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
+                    {selectedItemsCount === 0 ? (
+                      <p>Selecione entre 1 e 5 posts/reels para distribuir o total de {serviceType === 'curtidas' ? 'curtidas' : serviceType === 'visualizacao' || serviceType === 'reels' ? 'visualizações' : 'comentários'}.</p>
+                    ) : selectedItemsCount === 1 ? (
+                      <p>Todas as {service?.quantidade ? service.quantidade.toLocaleString() : '0'} {serviceType === 'curtidas' ? 'curtidas' : serviceType === 'visualizacao' || serviceType === 'reels' ? 'visualizações' : 'comentários'} serão aplicadas no item selecionado.</p>
+                    ) : hasUnevenDistribution ? (
+                      <p>O total de {service?.quantidade ? service.quantidade.toLocaleString() : '0'} {serviceType === 'curtidas' ? 'curtidas' : serviceType === 'visualizacao' || serviceType === 'reels' ? 'visualizações' : 'comentários'} será distribuído entre os {selectedItemsCount} itens ({baseQuantityPerItem} por item + {remainderQuantity} extra{remainderQuantity > 1 ? 's' : ''} para o{remainderQuantity > 1 ? 's' : ''} primeiro{remainderQuantity > 1 ? 's' : ''}).</p>
+                    ) : (
+                      <p>O total de {service?.quantidade ? service.quantidade.toLocaleString() : '0'} {serviceType === 'curtidas' ? 'curtidas' : serviceType === 'visualizacao' || serviceType === 'reels' ? 'visualizações' : 'comentários'} será dividido igualmente ({baseQuantityPerItem} por item) entre os {selectedItemsCount} itens selecionados.</p>
+                    )}
                   </div>
                 </div>
-              </Card>
-            </div>
-          </div>
-          </>
-        )}
-      </main>
 
-      {(loadingPosts || loadingReels) && (
-        <div className="fixed top-0 left-0 right-0 bottom-0 bg-gray-100 bg-opacity-50 flex items-center justify-center">
-          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
-            <div className="flex items-center justify-center mb-4">
-              <svg className="animate-spin h-10 w-10 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-            </div>
-            <p className="text-center text-lg font-medium text-gray-700">Buscando dados do Instagram</p>
-            <p className="text-center text-sm text-gray-500 mt-2">Isso pode levar até 60 segundos. Por favor, aguarde...</p>
-          </div>
-        </div>
-      )}
+                {/* Parte de Valores/Preços */}
+                <div className="mt-6 pt-4 border-t space-y-4">
+                  <div className="flex justify-between text-sm font-semibold">
+                    <span>Valor do serviço:</span>
+                    <span className="text-blue-600">R$ {service?.preco ? service.preco.toFixed(2).replace('.', ',') : '0,00'}</span>
+                  </div>
+                  
+                  <div className="flex justify-between text-lg font-semibold">
+                    <span>Valor total:</span>
+                    <span className="text-green-600">R$ {(finalAmount !== null ? finalAmount : (service?.preco || 0)).toFixed(2).replace('.', ',')}</span>
+                  </div>
 
-      {error && (
-        <div className="fixed top-0 left-0 right-0 bottom-0 bg-red-100 bg-opacity-50 flex items-center justify-center">
-          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
-            <div className="flex items-center justify-center mb-4">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-red-500" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <p className="text-center text-lg font-medium text-red-700">{error}</p>
-            <div className="mt-4 flex justify-center">
-              <button
-                onClick={() => setError(null)}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                  {discountAmount > 0 && (
+                    <div className="flex justify-between text-sm text-gray-600">
+                      <span>Valor original:</span>
+                      <span className="line-through">R$ {(service?.preco || 0).toFixed(2).replace('.', ',')}</span>
+                    </div>
+                  )}
+                </div>
 
-      {!error && postsLoaded && reelsLoaded && instagramPosts.length === 0 && instagramReels.length === 0 && profileData?.username && (
-        <div className="mt-6 text-center">
-          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-            <div className="flex flex-col items-center justify-center">
-              <div className="text-yellow-600 mb-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
+                {/* Cupom e Botão de Pagamento */}
+                <div className="space-y-4 pt-4 mt-4">
+                  <CouponInput 
+                    serviceId={service.id}
+                    originalAmount={service.preco}
+                    onCouponApplied={(discount, final, code) => {
+                      setDiscountAmount(discount);
+                      setFinalAmount(final);
+                      setAppliedCoupon(code || null);
+                    }}
+                  />
+                  
+                  <div className="flex items-center justify-center mt-4">
+                    <button 
+                      onClick={handleCheckout}
+                      disabled={loading || selectedItemsCount === 0 || !formData.name || !formData.email || !formData.phone}
+                      className={`
+                        px-6 py-3 rounded-full font-bold text-sm uppercase tracking-wider 
+                        transition-all duration-300 ease-in-out transform w-full
+                        ${loading || selectedItemsCount === 0 || !formData.name || !formData.email || !formData.phone
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:scale-105 hover:shadow-lg'}
+                      `}
+                    >
+                      {loading ? (
+                        <span className="flex items-center justify-center">
+                          <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                          Processando...
+                        </span>
+                      ) : (
+                        <span className="flex items-center justify-center">
+                          PAGAR COM PIX
+                        </span>
+                      )}
+                    </button>
+                </div>
               </div>
-              <p className="text-sm text-gray-600">
-                Não encontramos posts ou reels públicos para @{profileData.username}. Verifique se o nome de usuário está correto e se o perfil é público.
-              </p>
-            </div>
+            </Card>
           </div>
         </div>
+        </>
       )}
-    </div>
-  );
+    </main>
+
+    {(loadingPosts || loadingReels) && (
+      <div className="fixed top-0 left-0 right-0 bottom-0 bg-gray-100 bg-opacity-50 flex items-center justify-center">
+        <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+          <div className="flex items-center justify-center mb-4">
+            <svg className="animate-spin h-10 w-10 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          </div>
+          <p className="text-center text-lg font-medium text-gray-700">Buscando dados do Instagram</p>
+          <p className="text-center text-sm text-gray-500 mt-2">Isso pode levar até 60 segundos. Por favor, aguarde...</p>
+        </div>
+      </div>
+    )}
+
+    {error && (
+      <div className="fixed top-0 left-0 right-0 bottom-0 bg-red-100 bg-opacity-50 flex items-center justify-center">
+        <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+          <div className="flex items-center justify-center mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <p className="text-center text-lg font-medium text-red-700">{error}</p>
+          <div className="mt-4 flex justify-center">
+            <button
+              onClick={() => setError(null)}
+              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {!error && postsLoaded && reelsLoaded && instagramPosts.length === 0 && instagramReels.length === 0 && profileData?.username && (
+      <div className="mt-6 text-center">
+        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+          <div className="flex flex-col items-center justify-center">
+            <div className="text-yellow-600 mb-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <p className="text-sm text-gray-600">
+              Não encontramos posts ou reels públicos para @{profileData.username}. Verifique se o nome de usuário está correto e se o perfil é público.
+            </p>
+          </div>
+        </div>
+      </div>
+    )}
+  </div>
+);
 }
