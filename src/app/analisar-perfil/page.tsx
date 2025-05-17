@@ -8,9 +8,9 @@ import { EngagementAnalysis } from '@/components/profile-analyzer/EngagementAnal
 import { EngagementProjectionChart } from '@/components/profile-analyzer/EngagementProjectionChart';
 import { AdvancedMetrics } from '@/components/profile-analyzer/AdvancedMetrics';
 import { ShareReport } from '@/components/profile-analyzer/ShareReport';
-import { FaSpinner, FaPlus, FaHeart, FaWhatsapp } from 'react-icons/fa';
+import { FaSpinner, FaPlus, FaWhatsapp } from 'react-icons/fa';
 import { Header } from '@/components/layout/header';
-import Link from 'next/link';import { Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 interface ProfileData {
   username?: string;
@@ -726,24 +726,6 @@ function ProfileAnalyzerContent() {
                   </h3>
 
                   {renderContentGrid(activeContentTab)}
-
-                  {/* Botões de Ação */}
-                  {profileData && (
-                    <div className="flex flex-col md:flex-row justify-center items-center gap-4 mt-6">
-                      <Link 
-                        href="/instagram/seguidores" 
-                        className="flex items-center justify-center bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105"
-                      >
-                        <FaPlus className="mr-2" /> Adicionar Seguidores
-                      </Link>
-                      <Link 
-                        href="/instagram/curtidas" 
-                        className="flex items-center justify-center bg-pink-500 hover:bg-pink-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105"
-                      >
-                        <FaHeart className="mr-2" /> Adicionar Curtidas
-                      </Link>
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -778,37 +760,52 @@ function ProfileAnalyzerContent() {
                 />
               )}
 
-              {/* Botão de Compartilhar no WhatsApp */}
+              {/* Botões de Compartilhar no WhatsApp e Comprar Seguidores */}
               {profileData && contentData.length > 0 && (
-                <div className="max-w-3xl mx-auto bg-white rounded-lg shadow-lg p-6 mb-8 text-center">
-                  <h3 className="text-xl font-bold mb-4">Compartilhar Análise</h3>
-                  <a
-                    href={`https://wa.me/?text=🔍%20Olha%20só!%20Análise%20completa%20do%20perfil%20${profileData.username}%20com%20${profileData.followers_count?.toLocaleString()}%20seguidores!%20📊%0A%0A🚀%20Você%20também%20quer%20aumentar%20seus%20seguidores%20e%20curtidas?%0A%0A⭐%20Visite%20agora%20viralizamos.com%20e%20turbine%20seu%20Instagram%20com%20seguidores%20e%20curtidas%20reais!%20🔥`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center px-6 py-3 bg-green-500 text-white font-bold rounded-full hover:bg-green-600 transition-colors mb-4"
-                  >
-                    <FaWhatsapp className="mr-2 text-xl" /> Compartilhar no WhatsApp
-                  </a>
-                  
-                  {/* Botão de Compra de Seguidores com Tag de Promoção */}
-                  <div className="mt-6 relative">
-                    <div className="absolute -top-5 right-0 left-0 mx-auto w-max">
-                      <span className="bg-red-500 text-white text-sm font-bold py-1 px-3 rounded-full animate-pulse">
-                        PROMOÇÃO LIMITADA! 🔥
-                      </span>
+                <div className="max-w-3xl mx-auto bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl shadow-xl p-8 mb-8">
+                  <div className="grid md:grid-cols-2 gap-8">
+                    {/* Coluna 1: Compartilhar no WhatsApp */}
+                    <div className="text-center md:text-left space-y-4">
+                      <h3 className="text-xl font-bold text-gray-800">Compartilhar Análise</h3>
+                      <p className="text-gray-600">Compartilhe essa análise com seus amigos e seguidores!</p>
+                      <a
+                        href={`https://wa.me/?text=🔍%20Olha%20só!%20Análise%20completa%20do%20perfil%20${profileData.username}%20com%20${profileData.followers_count?.toLocaleString()}%20seguidores!%20📊%0A%0A🚀%20Você%20também%20quer%20aumentar%20seus%20seguidores%20e%20curtidas?%0A%0A⭐%20Visite%20agora%20viralizamos.com%20e%20turbine%20seu%20Instagram%20com%20seguidores%20e%20curtidas%20reais!%20🔥`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center px-6 py-3 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600 transition-all duration-300 transform hover:scale-105 shadow-lg"
+                      >
+                        <FaWhatsapp className="mr-2 text-2xl" /> Compartilhar no WhatsApp
+                      </a>
                     </div>
-                    <a
-                      href="https://viralizamos.com/instagram/seguidores"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-bold rounded-full hover:bg-blue-700 transition-colors transform hover:scale-105 shadow-lg"
-                    >
-                      <FaPlus className="mr-2 text-xl" /> Compre mais seguidores
-                    </a>
-                    <p className="text-sm text-gray-600 mt-2">
-                      Turbine seu perfil com seguidores reais e aumente seu alcance!
-                    </p>
+
+                    {/* Coluna 2: Comprar Seguidores */}
+                    <div className="text-center md:text-left space-y-4 relative overflow-hidden rounded-xl bg-white p-6 shadow-md border-2 border-blue-200">
+                      {/* Badge de promoção */}
+                      <div className="absolute -right-12 top-6 rotate-45 bg-red-500 text-white px-10 py-1 font-bold text-sm">
+                        OFERTA
+                      </div>
+                      
+                      <h3 className="text-xl font-bold text-blue-800">Turbine seu Perfil! 🚀</h3>
+                      <div className="flex flex-col gap-2">
+                        <p className="text-gray-700">Aumente seu alcance com seguidores reais:</p>
+                        <div className="flex items-center justify-center md:justify-start text-sm space-x-2 mb-1">
+                          <span className="flex items-center text-green-600"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg> Entrega Rápida</span>
+                          <span className="flex items-center text-green-600"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg> 100% Seguro</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-center md:justify-start space-x-2 text-sm font-medium">
+                        <span className="line-through text-gray-500">R$99,90</span>
+                        <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">-30%</span>
+                      </div>
+                      <a
+                        href="https://viralizamos.com/instagram/seguidores"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl"
+                      >
+                        <FaPlus className="mr-2 text-xl" /> Comprar Seguidores Agora
+                      </a>
+                    </div>
                   </div>
                 </div>
               )}
