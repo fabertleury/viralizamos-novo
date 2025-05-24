@@ -49,13 +49,13 @@ export default async function RootLayout({
             referrerPolicy="no-referrer"
           />
           {/* Google Tag (gtag.js) */}
-          <Script async src="https://www.googletagmanager.com/gtag/js?id=AW-16904345570" strategy="afterInteractive" />
+          <Script async src="https://www.googletagmanager.com/gtag/js?id=AW-11142375433" strategy="afterInteractive" />
           <Script id="google-analytics" strategy="afterInteractive">
             {`
               window.dataLayer = window.dataLayer || [];
               function gtag(){dataLayer.push(arguments);}
               gtag('js', new Date());
-              gtag('config', 'AW-16904345570');
+              gtag('config', 'AW-11142375433');
             `}
           </Script>
           {/* Microsoft Clarity */}
@@ -98,13 +98,13 @@ export default async function RootLayout({
           referrerPolicy="no-referrer"
         />
         {/* Google Tag (gtag.js) */}
-        <Script async src="https://www.googletagmanager.com/gtag/js?id=AW-16904345570" strategy="afterInteractive" />
+        <Script async src="https://www.googletagmanager.com/gtag/js?id=AW-11142375433" strategy="afterInteractive" />
         <Script id="google-analytics" strategy="afterInteractive">
           {`
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
-            gtag('config', 'AW-16904345570');
+            gtag('config', 'AW-11142375433');
           `}
         </Script>
         {/* Microsoft Clarity */}
