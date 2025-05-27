@@ -403,7 +403,7 @@ export default function HomeV3() {
   }, []);
 
   const [configurations, setConfigurations] = useState<{[key: string]: string}>({
-    whatsapp_numero: '+5562981287058',
+    whatsapp_numero: '+5562999915390',
     whatsapp_ativo: 'true',
     ticket_link: 'https://suporte.viralizamos.com',
     ticket_ativo: 'true'
