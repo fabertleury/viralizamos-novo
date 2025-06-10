@@ -574,10 +574,10 @@ export function InstagramSeguidoresStep2({ title }: InstagramSeguidoresStep2Prop
               <div className="bg-blue-50 p-4 rounded-lg">
                 <h3 className="font-semibold text-blue-700 mb-2">Importante</h3>
                 <ul className="list-disc list-inside text-blue-700 text-sm space-y-1">
-                  <li>Certifique-se de que o perfil está público durante o processo de entrega</li>
-                  <li>Não altere o nome de usuário durante o processo</li>
-                  <li>A entrega pode levar até 24 horas para ser concluída</li>
-                  <li>Os seguidores são de alta qualidade e possuem foto de perfil e posts</li>
+                  <li><strong>ATENÇÃO:</strong> Manter o perfil público é obrigatório! Perfis privados causam falhas e não têm direito a reenvio ou reembolso</li>
+                  <li><strong>NÃO ALTERE</strong> o nome de usuário durante ou após o processo, ou você perderá a garantia de reposição</li>
+                  <li>O prazo de entrega é de até 24 horas após a confirmação do pagamento</li>
+                  <li>Todos os seguidores têm foto de perfil e publicações, garantindo alta qualidade</li>
                 </ul>
               </div>
             </div>
