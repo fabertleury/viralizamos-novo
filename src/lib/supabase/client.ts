@@ -1,5 +1,6 @@
 import { createClient as createSupabaseClient, SupabaseClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/config/supabase';
+import { corsHeaders } from '../shared/cors';
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   throw new Error('Missing Supabase environment variables');
@@ -21,13 +22,12 @@ export const createClient = () => {
     },
     global: {
       headers: {
-        // Adicionar cabeçalhos que ajudam a passar pelo Cloudflare
         'X-Client-Info': 'supabase-js/2.31.0',
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate'
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        ...corsHeaders
       }
     },
     realtime: {
-      // Melhorar a performance de reconexão
       params: {
         eventsPerSecond: 10
       }
