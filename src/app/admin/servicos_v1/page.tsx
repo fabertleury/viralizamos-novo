@@ -35,6 +35,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import * as XLSX from 'xlsx';
 
 interface Service {
   id: string;
@@ -807,6 +808,47 @@ export default function ServicosV1Page() {
     }
   };
 
+  // Função para exportar para Excel
+  const exportToExcel = async () => {
+    // Filtrar apenas serviços ativos
+    const activeServices = services.filter(s => s.status);
+    // Montar dados para exportação
+    const exportData = [];
+    for (const service of activeServices) {
+      const categoryName = service.category?.name || '';
+      const providerName = service.provider?.name || '';
+      const serviceName = service.name;
+      const custoProvedor = service.custo_provedor || service.cost_per_1000 || (service.metadata?.custo_provedor || service.metadata?.cost_per_1000) || '';
+      // Variações de quantidade/preço
+      const variations = service.metadata?.quantidade_preco || [];
+      for (const variation of variations) {
+        const quantidade = variation.quantidade;
+        const precoVenda = variation.preco;
+        // Cálculo do custo proporcional
+        let custoUnitario = 0;
+        let custoPacote = 0;
+        if (custoProvedor && quantidade) {
+          custoUnitario = Number(custoProvedor) / 1000;
+          custoPacote = custoUnitario * quantidade;
+        }
+        exportData.push({
+          'Categoria': categoryName,
+          'Nome do Serviço': serviceName,
+          'Provedor': providerName,
+          'Quantidade do Pacote': quantidade,
+          'Preço de Venda': precoVenda,
+          'Custo Provedor (por 1000)': custoProvedor,
+          'Custo Proporcional do Pacote': custoPacote.toFixed(2)
+        });
+      }
+    }
+    // Gerar planilha
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Serviços Ativos');
+    XLSX.writeFile(wb, 'servicos_ativos.xlsx');
+  };
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
@@ -821,6 +863,13 @@ export default function ServicosV1Page() {
             Novo Serviço
           </Button>
         </div>
+      </div>
+
+      {/* Botão de exportação para Excel */}
+      <div className="flex justify-end mb-4">
+        <Button onClick={exportToExcel} variant="outline" className="bg-green-500 text-white hover:bg-green-600">
+          Exportar para Excel
+        </Button>
       </div>
 
       {/* Barra de pesquisa */}

@@ -18,8 +18,9 @@ if (typeof window === 'undefined') {
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Viralizamos - Impulsione seu Instagram',
-  description: 'Aumente seu alcance no Instagram com likes reais e seguidores engajados.',
+  title: 'Comprar Seguidores Instagram, Curtidas e Visualizações | Viralizamos',
+  description: 'Compre seguidores brasileiros para Instagram, curtidas reais e visualizações de alta qualidade. Aumente seu engajamento de forma segura e rápida. Resultados imediatos!',
+  keywords: 'comprar seguidores instagram, seguidores brasileiros, curtidas reais, comprar curtidas instagram, visualizações instagram, comprar seguidores, instagram seguidor, comprar seguidores instagram barato',
   icons: {
     icon: '/images/favicon.png',
     shortcut: '/images/favicon.png',

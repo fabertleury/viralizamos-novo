@@ -9,7 +9,8 @@ const ServicosSection = () => {
     <section className="bg-white py-16">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold mb-4">Serviços de qualidade, Sigilo total!</h2>
+          <h2 className="text-3xl font-bold mb-4">Compre Serviços de Qualidade para Instagram com Total Sigilo</h2>
+          <p className="text-lg text-gray-600 mb-4">Oferecemos seguidores brasileiros reais, curtidas, visualizações e comentários para seu perfil</p>
         </div>
         
         <div className="grid md:grid-cols-2 gap-8">
@@ -17,7 +18,7 @@ const ServicosSection = () => {
             <FaClock className="mx-auto text-4xl text-blue-500 mb-4" />
             <h3 className="text-xl font-semibold mb-2">Resultados rápidos</h3>
             <p className="text-gray-600">
-              Geralmente iniciamos em minutos e finalizamos em poucas horas
+              Seguidores e curtidas entregues em minutos - Mais de 98% dos pedidos são finalizados em menos de 24 horas
             </p>
           </div>
           
@@ -25,7 +26,7 @@ const ServicosSection = () => {
             <FaWhatsapp className="mx-auto text-4xl text-green-500 mb-4" />
             <h3 className="text-xl font-semibold mb-2">Suporte via WhatsApp</h3>
             <p className="text-gray-600">
-              Suporte Online das 8h as 23h todos os dias, para dúvidas e reclamações
+              Suporte Online das 8h as 23h todos os dias, para dúvidas e reclamações sobre seus pedidos de seguidores
             </p>
           </div>
           
@@ -33,7 +34,7 @@ const ServicosSection = () => {
             <FaRocket className="mx-auto text-4xl text-purple-500 mb-4" />
             <h3 className="text-xl font-semibold mb-2">Barato e acessível</h3>
             <p className="text-gray-600">
-              Orgulhamos de nossa alta qualidade, velocidade e preços
+              Os melhores preços do mercado para comprar seguidores brasileiros reais e curtidas de qualidade para Instagram
             </p>
           </div>
           
@@ -41,7 +42,7 @@ const ServicosSection = () => {
             <FaShieldAlt className="mx-auto text-4xl text-red-500 mb-4" />
             <h3 className="text-xl font-semibold mb-2">Pagamentos seguros</h3>
             <p className="text-gray-600">
-              Temos métodos populares como MERCADO PAGO para processar seus pedidos
+              Métodos de pagamento seguros como MERCADO PAGO para comprar seguidores, curtidas e visualizações com segurança
             </p>
           </div>
         </div>
@@ -51,7 +52,7 @@ const ServicosSection = () => {
             href="/instagram"
             className="bg-[#C43582] text-white px-8 py-3 rounded-full text-xl font-bold hover:bg-[#a62c6c] transition"
           >
-            Clique aqui e Comece agora
+            Comprar Seguidores e Curtidas
           </a>
         </div>
       </div>

@@ -210,12 +210,17 @@ export default function CurtidasPage() {
               <div className="absolute inset-0 bg-black opacity-20"></div>
               <div className="relative z-10 flex items-center justify-center p-12 text-center">
                 <div className="text-white max-w-2xl">
-                  <h2 className="text-4xl md:text-5xl font-bold mb-6">
-                    Curtidas para Instagram
-                  </h2>
+                  <h1 className="text-4xl md:text-5xl font-bold mb-6">
+                    Comprar Curtidas para Instagram
+                  </h1>
                   <p className="text-xl md:text-2xl mb-0">
-                    Aumente a credibilidade do seu perfil com curtidas de alta qualidade
+                    Curtidas brasileiras reais e de alta qualidade para aumentar o engajamento dos seus posts imediatamente
                   </p>
+                  <div className="mt-4">
+                    <span className="inline-block bg-white bg-opacity-20 text-white text-xs px-2 py-1 rounded mr-2 mb-2">#curtidasinstagram</span>
+                    <span className="inline-block bg-white bg-opacity-20 text-white text-xs px-2 py-1 rounded mr-2 mb-2">#comprarcurtidas</span>
+                    <span className="inline-block bg-white bg-opacity-20 text-white text-xs px-2 py-1 rounded mr-2 mb-2">#likesreais</span>
+                  </div>
                 </div>
               </div>
             </div>

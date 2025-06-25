@@ -1,8 +1,24 @@
 import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { corsHeaders } from './lib/shared/cors';
 
-export async function middleware(request: NextRequest) {
+export function middleware(request: NextRequest) {
+  // Verificar se é uma requisição OPTIONS (preflight)
+  if (request.method === 'OPTIONS') {
+    return new NextResponse(null, {
+      status: 200,
+      headers: corsHeaders,
+    });
+  }
+
+  // Para outras requisições, adicionar os headers CORS
+  const response = NextResponse.next();
+  
+  Object.entries(corsHeaders).forEach(([key, value]) => {
+    response.headers.set(key, value);
+  });
+
   // Proxy para imagens do Instagram
   if (request.nextUrl.pathname.startsWith('/proxy/instagram-image')) {
     // Decodifica o caminho da imagem
@@ -51,7 +67,7 @@ export async function middleware(request: NextRequest) {
     return new NextResponse(null, { status: 404 });
   }
 
-  const res = NextResponse.next();
+  const res = response;
   
   // Adiciona o pathname aos headers para uso no layout
   res.headers.set('x-pathname', request.nextUrl.pathname);
@@ -181,6 +197,7 @@ export const config = {
     '/admin/:path*',
     '/cliente/:path*',
     '/suporte/:path*',
-    '/proxy/instagram-image/:path*'
+    '/proxy/instagram-image/:path*',
+    '/api/:path*'
   ]
 };

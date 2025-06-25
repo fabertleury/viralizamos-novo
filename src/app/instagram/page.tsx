@@ -277,102 +277,93 @@ export default function InstagramPage() {
   return (
     <>
       <Header />
-      {/* Banner de destaque revertido */}
-      <motion.div
-        initial={{ opacity: 0, y: -30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, type: 'spring' }}
-        className="container mx-auto px-4 mt-6 mb-8"
-      >
-        <div className="relative bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl overflow-hidden shadow-xl animate-gradient-x">
-          <div className="absolute inset-0 bg-black opacity-20"></div>
-          <div className="relative z-10 flex items-center justify-center p-12 text-center">
-            <div className="text-white max-w-2xl">
-              <h2 className="text-4xl md:text-5xl font-bold mb-6 flex items-center justify-center gap-2">
-                <span role='img' aria-label='foguete'>🚀</span>
-                SERVIÇOS PARA INSTAGRAM
-              </h2>
-              <p className="text-xl md:text-2xl mb-0">
-                Escolha o que você precisa para o seu perfil
+      <main>
+        {/* SEO Header Section */}
+        <section className="bg-gradient-to-r from-purple-600 to-pink-600 py-16 relative overflow-hidden">
+          <div className="absolute inset-0 bg-pattern opacity-10"></div>
+          <div className="container mx-auto px-4">
+            <div className="max-w-4xl mx-auto text-center text-white">
+              <h1 className="text-4xl md:text-5xl font-bold mb-6">
+                Serviços para Instagram - Compre Seguidores, Curtidas e Visualizações
+              </h1>
+              <p className="text-xl md:text-2xl mb-8">
+                Impulsione seu perfil com seguidores brasileiros reais, curtidas e visualizações de alta qualidade. Entrega imediata!
               </p>
+              <div className="flex flex-wrap justify-center gap-2 mb-8">
+                <span className="bg-white bg-opacity-20 px-3 py-1 rounded-full text-sm">#seguidoresinstagram</span>
+                <span className="bg-white bg-opacity-20 px-3 py-1 rounded-full text-sm">#curtidasreais</span>
+                <span className="bg-white bg-opacity-20 px-3 py-1 rounded-full text-sm">#visualizacoesreels</span>
+                <span className="bg-white bg-opacity-20 px-3 py-1 rounded-full text-sm">#comprarseguidoresinstagram</span>
+              </div>
+              <div className="flex justify-center">
+                <p className="text-2xl font-bold animate-pulse">
+                  🚀Mais de 10.000 perfis já foram impulsionados com sucesso!
+                </p>
+              </div>
             </div>
           </div>
-        </div>
-      </motion.div>
+        </section>
 
-      <main className="min-h-screen bg-gray-50 py-12">
-        <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto text-center">
+        {/* Categories Section */}
+        <section className="py-12">
+          <div className="container mx-auto px-4">
+            <h2 className="text-2xl md:text-3xl font-bold text-center mb-12">
+              Escolha o que você precisa para o seu perfil
+            </h2>
+
             {loading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[1, 2, 3].map((i) => (
-                  <Card key={i} className="p-6 animate-pulse h-full">
-                    <div className="h-6 bg-gray-200 rounded w-3/4 mb-4"></div>
-                    <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
-                    <div className="h-4 bg-gray-200 rounded w-2/3"></div>
-                  </Card>
+              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="h-64 bg-gray-100 rounded-lg animate-pulse" />
                 ))}
               </div>
             ) : (
-              <>
-                {groupedSubcategories.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {groupedSubcategories.map((group, idx) => (
-                      <Link 
-                        key={group.slug} 
-                        href={`/instagram/${group.slug}`}
-                        className="transform transition-all duration-200 hover:scale-105 h-full"
-                      >
-                        <Card className={`p-6 cursor-pointer bg-white hover:shadow-lg transition-shadow duration-200 h-full flex flex-col relative ${idx === 0 ? 'ring-2 ring-yellow-400 shadow-xl' : ''}`}>
-                          {/* Badge de Mais vendidos no primeiro card */}
-                          {idx === 0 && (
-                            <span className="absolute top-3 left-3 px-3 py-1 bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs font-bold rounded-full shadow-md z-20 animate-pulse">
-                              Mais vendidos
-                            </span>
-                          )}
-                          {/* Bolinha verde de status online */}
-                          <span className="absolute top-3 right-3 w-3 h-3 bg-green-500 rounded-full shadow-md animate-pulse border-2 border-white z-10" title="Serviço online"></span>
-                          <div className="flex items-center gap-4 mb-4">
-                            <div className={`p-3 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white`}>
-                              {group.icon}
-                            </div>
-                            <h3 className="text-xl font-semibold text-gray-900">
-                              {group.name}
-                            </h3>
-                          </div>
-                          <p className="text-gray-600 text-sm mb-2 flex-grow">
-                            {group.description}
-                          </p>
-                          {/* Mensagem sutil de visualizações */}
-                          <div className="flex items-center justify-center mt-4">
-                            <span className="text-xs text-gray-500">
-                              👀 {viewers[group.slug] || 0} pessoas estão de olho nesse serviço
-                            </span>
-                          </div>
-                          {/* Botão Comprar Agora */}
-                          <div className="flex items-center justify-center mt-2">
-                            <button className="px-6 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-sm shadow hover:from-purple-700 hover:to-pink-700 transition-all duration-200">
-                              Comprar Agora
-                            </button>
-                          </div>
-                        </Card>
-                      </Link>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12 bg-gray-100 rounded-lg">
-                    <h2 className="text-2xl font-semibold text-gray-700 mb-4">
-                      Nenhum serviço encontrado
-                    </h2>
-                    <p className="text-gray-600">
-                      Não há serviços disponíveis no momento.
-                    </p>
-                  </div>
-                )}
-              </>
+              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {groupedSubcategories.map((group, idx) => (
+                  <Link 
+                    key={group.slug} 
+                    href={`/instagram/${group.slug}`}
+                    className="transform transition-all duration-200 hover:scale-105 h-full"
+                  >
+                    <Card className={`p-6 cursor-pointer bg-white hover:shadow-lg transition-shadow duration-200 h-full flex flex-col relative ${idx === 0 ? 'ring-2 ring-yellow-400 shadow-xl' : ''}`}>
+                      {/* Badge de Mais vendidos no primeiro card */}
+                      {idx === 0 && (
+                        <span className="absolute top-3 left-3 px-3 py-1 bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs font-bold rounded-full shadow-md z-20 animate-pulse">
+                          Mais vendidos
+                        </span>
+                      )}
+                      {/* Bolinha verde de status online */}
+                      <span className="absolute top-3 right-3 w-3 h-3 bg-green-500 rounded-full shadow-md animate-pulse border-2 border-white z-10" title="Serviço online"></span>
+                      <div className="flex items-center gap-4 mb-4">
+                        <div className={`p-3 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white`}>
+                          {group.icon}
+                        </div>
+                        <h3 className="text-xl font-semibold text-gray-900">
+                          {group.name}
+                        </h3>
+                      </div>
+                      <p className="text-gray-600 text-sm mb-2 flex-grow">
+                        {group.description}
+                      </p>
+                      {/* Mensagem sutil de visualizações */}
+                      <div className="flex items-center justify-center mt-4">
+                        <span className="text-xs text-gray-500">
+                          👀 {viewers[group.slug] || 0} pessoas estão de olho nesse serviço
+                        </span>
+                      </div>
+                      {/* Botão Comprar Agora */}
+                      <div className="flex items-center justify-center mt-2">
+                        <button className="px-6 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-sm shadow hover:from-purple-700 hover:to-pink-700 transition-all duration-200">
+                          Comprar Agora
+                        </button>
+                      </div>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
             )}
           </div>
-        </div>
+        </section>
 
         {/* Banner de Prova Social abaixo dos serviços */}
         <div className="container mx-auto px-4 mt-12 mb-16">

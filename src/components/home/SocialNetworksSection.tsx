@@ -49,8 +49,15 @@ const SocialNetworksSection = () => {
     <section className="choose-social">
       <div className="container">
         <div className="section-header">
-          <h2>Turbine seus seguidores, curtidas, comentários e muito mais...</h2>
-          <p>Escolha a rede social que você deseja impulsionar</p>
+          <h2>Compre Seguidores, Curtidas, Comentários e Visualizações para Instagram</h2>
+          <p>Milhares de clientes satisfeitos escolhem a Viralizamos para impulsionar seu perfil no Instagram</p>
+          <div className="keywords-seo my-2">
+            <span className="badge bg-light text-dark mx-1 mb-1">Seguidores Brasileiros</span>
+            <span className="badge bg-light text-dark mx-1 mb-1">Curtidas Reais</span>
+            <span className="badge bg-light text-dark mx-1 mb-1">Visualizações em Reels</span>
+            <span className="badge bg-light text-dark mx-1 mb-1">Serviço Seguro</span>
+            <span className="badge bg-light text-dark mx-1 mb-1">Entrega Rápida</span>
+          </div>
         </div>
         <div className="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 justify-content-center">
           {socialNetworks.map((social) => (
