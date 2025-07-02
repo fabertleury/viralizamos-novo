@@ -8,6 +8,13 @@ import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 
+interface ServiceDetails {
+  global_reach: boolean;
+  fast_delivery: boolean;
+  guaranteed_security: boolean;
+  [key: string]: boolean;
+}
+
 interface Service {
   id: string;
   name: string;
@@ -21,22 +28,34 @@ interface Service {
   discount_price?: number;
   quantidade_preco: { quantidade: number; preco: number; preco_original?: number }[];
   metadata?: {
-    service_details?: {
-      global_reach?: boolean;
-      fast_delivery?: boolean;
-      guaranteed_security?: boolean;
-      [key: string]: any;
-    };
-    [key: string]: any;
+    service_details?: Partial<ServiceDetails>;
+    quantidade_preco?: { quantidade: number; preco: number; preco_original?: number }[];
+    [key: string]: unknown;
   };
   type: string;
+  isbestseller?: string;
+}
+
+interface DatabaseService {
+  id: string;
+  name: string;
+  descricao: string;
+  preco: number;
+  min_order?: number;
+  max_order?: number;
+  categoria?: string;
+  status: boolean;
+  metadata?: Record<string, unknown>;
+  service_variations?: { quantidade: number; preco: number; preco_original?: number }[];
+  checkout_type_id?: string;
+  type?: string;
   isbestseller?: string;
 }
 
 export default function SeguidoresPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedServices, setSelectedServices] = useState<{[key: string]: number}>({});
+  const [selectedServices, setSelectedServices] = useState<Record<string, number>>({});
   const supabase = createClient();
 
   useEffect(() => {
@@ -73,7 +92,7 @@ export default function SeguidoresPage() {
         if (error) throw error;
 
         // Transformar os dados para o formato esperado
-        const formattedServices: Service[] = (data || [])
+        const formattedServices: Service[] = (data as DatabaseService[] || [])
           .filter(service => {
             const categoria = service.categoria?.toLowerCase() || '';
             const nome = service.name?.toLowerCase() || '';
@@ -85,9 +104,9 @@ export default function SeguidoresPage() {
               service.type === 'seguidores'
             );
           })
-          .map((service: any) => {
+          .map((service) => {
             // Tratar metadata de forma segura
-            let metadata: Record<string, any> = {};
+            let metadata: Record<string, unknown> = {};
             try {
               metadata = service.metadata && typeof service.metadata === 'string' 
                 ? JSON.parse(service.metadata) 
@@ -97,10 +116,10 @@ export default function SeguidoresPage() {
             }
 
             // Verificar se service_variations existe, senão usar metadata.quantidade_preco
-            const variations = service.service_variations || (metadata.quantidade_preco as any[]) || [];
+            const variations = service.service_variations || ((metadata.quantidade_preco as { quantidade: number; preco: number; preco_original?: number }[]) || []);
             
             // Garantir que as variações tenham o formato correto com preco_original
-            const formattedVariations = variations.map((v: any) => ({
+            const formattedVariations = variations.map((v) => ({
               quantidade: v.quantidade,
               preco: v.preco,
               preco_original: v.preco_original || null
@@ -114,14 +133,14 @@ export default function SeguidoresPage() {
               min_quantity: service.min_order || 50,
               max_quantity: service.max_order || 10000,
               slug: service.name.toLowerCase().replace(/\s+/g, '-'),
-              categoria: service.categoria,
+              categoria: service.categoria || '',
               status: service.status,
-              discount_price: metadata.discount_price,
+              discount_price: metadata.discount_price as number | undefined,
               quantidade_preco: formattedVariations,
               metadata: {
-                service_details: metadata.service_details || {}
+                service_details: metadata.service_details as Partial<ServiceDetails> || {}
               },
-              type: service.type,
+              type: service.type || '',
               isbestseller: service.isbestseller
             };
           });
@@ -224,11 +243,6 @@ export default function SeguidoresPage() {
                   <p className="text-xl md:text-2xl mb-0">
                     Aumente a credibilidade do seu perfil com seguidores de alta qualidade
                   </p>
-                  <div className="mt-4">
-                    <span className="inline-block bg-white bg-opacity-20 text-white text-xs px-2 py-1 rounded mr-2 mb-2">#seguidoresinstagram</span>
-                    <span className="inline-block bg-white bg-opacity-20 text-white text-xs px-2 py-1 rounded mr-2 mb-2">#comprarseguidores</span>
-                    <span className="inline-block bg-white bg-opacity-20 text-white text-xs px-2 py-1 rounded mr-2 mb-2">#seguidoresbrasileiros</span>
-                  </div>
                 </div>
               </div>
             </div>
@@ -249,7 +263,7 @@ export default function SeguidoresPage() {
               ) : (
                 <div className="space-y-12">
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-                    {services.map((service, index) => (
+                    {services.map((service) => (
                       <Card 
                         key={service.id} 
                         className="flex flex-col p-6 rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 ease-in-out relative"
