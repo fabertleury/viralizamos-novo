@@ -219,10 +219,10 @@ export default function SeguidoresPage() {
               <div className="relative z-10 flex items-center justify-center p-12 text-center">
                 <div className="text-white max-w-2xl">
                   <h1 className="text-4xl md:text-5xl font-bold mb-6">
-                    Comprar Seguidores para Instagram
+                    Seguidores para Instagram
                   </h1>
                   <p className="text-xl md:text-2xl mb-0">
-                    Seguidores brasileiros reais e de alta qualidade para aumentar a credibilidade do seu perfil instantaneamente
+                    Aumente a credibilidade do seu perfil com seguidores de alta qualidade
                   </p>
                   <div className="mt-4">
                     <span className="inline-block bg-white bg-opacity-20 text-white text-xs px-2 py-1 rounded mr-2 mb-2">#seguidoresinstagram</span>
