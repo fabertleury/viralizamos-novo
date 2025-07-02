@@ -8,6 +8,13 @@ import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 
+interface ServiceDetails {
+  global_reach: boolean;
+  fast_delivery: boolean;
+  guaranteed_security: boolean;
+  [key: string]: boolean;
+}
+
 interface Service {
   id: string;
   name: string;
@@ -21,15 +28,27 @@ interface Service {
   discount_price?: number;
   quantidade_preco: { quantidade: number; preco: number; preco_original?: number }[];
   metadata?: {
-    service_details?: {
-      global_reach?: boolean;
-      fast_delivery?: boolean;
-      guaranteed_security?: boolean;
-      [key: string]: any;
-    };
-    [key: string]: any;
+    service_details?: Partial<ServiceDetails>;
+    quantidade_preco?: { quantidade: number; preco: number; preco_original?: number }[];
+    [key: string]: unknown;
   };
   type: string;
+  isbestseller?: string;
+}
+
+interface DatabaseService {
+  id: string;
+  name: string;
+  descricao: string;
+  preco: number;
+  min_order?: number;
+  max_order?: number;
+  categoria?: string;
+  status: boolean;
+  metadata?: Record<string, unknown>;
+  service_variations?: { quantidade: number; preco: number; preco_original?: number }[];
+  checkout_type_id?: string;
+  type?: string;
   isbestseller?: string;
 }
 
@@ -198,16 +217,11 @@ export default function VisualizacoesPage() {
             <div className="relative z-10 flex items-center justify-center p-12 text-center">
               <div className="text-white max-w-2xl">
                 <h1 className="text-4xl md:text-5xl font-bold mb-6">
-                  Comprar Visualizações para Instagram
+                  Visualizações para Instagram
                 </h1>
                 <p className="text-xl md:text-2xl mb-0">
-                  Visualizações reais para seus Reels e vídeos no Instagram - Aumente seu alcance e viralize seu conteúdo
+                  Impulsione a visibilidade dos seus Reels e Stories
                 </p>
-                <div className="mt-4">
-                  <span className="inline-block bg-white bg-opacity-20 text-white text-xs px-2 py-1 rounded mr-2 mb-2">#visualizacoesinstagram</span>
-                  <span className="inline-block bg-white bg-opacity-20 text-white text-xs px-2 py-1 rounded mr-2 mb-2">#viewsreels</span>
-                  <span className="inline-block bg-white bg-opacity-20 text-white text-xs px-2 py-1 rounded mr-2 mb-2">#comprarviews</span>
-                </div>
               </div>
             </div>
           </div>
@@ -227,7 +241,7 @@ export default function VisualizacoesPage() {
           ) : services.length > 0 ? (
             <div className="space-y-12">
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-                {services.map((service, index) => (
+                {services.map((service) => (
                   <Card 
                     key={service.id} 
                     className="flex flex-col p-6 rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 ease-in-out relative"
