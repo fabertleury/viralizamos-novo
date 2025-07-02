@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { FaInstagram } from 'react-icons/fa';
 import { toast } from 'sonner';
+import Link from 'next/link';
 
 // Interface para as redes sociais
 interface SocialNetwork {
@@ -48,16 +49,9 @@ const SocialNetworksSection = () => {
   return (
     <section className="choose-social">
       <div className="container">
-        <div className="section-header">
-          <h2>Compre Seguidores, Curtidas, Comentários e Visualizações para Instagram</h2>
-          <p>Milhares de clientes satisfeitos escolhem a Viralizamos para impulsionar seu perfil no Instagram</p>
-          <div className="keywords-seo my-2">
-            <span className="badge bg-light text-dark mx-1 mb-1">Seguidores Brasileiros</span>
-            <span className="badge bg-light text-dark mx-1 mb-1">Curtidas Reais</span>
-            <span className="badge bg-light text-dark mx-1 mb-1">Visualizações em Reels</span>
-            <span className="badge bg-light text-dark mx-1 mb-1">Serviço Seguro</span>
-            <span className="badge bg-light text-dark mx-1 mb-1">Entrega Rápida</span>
-          </div>
+        <div className="section-header text-center mb-12">
+          <h2 className="text-3xl font-bold mb-4">Turbine seus seguidores, curtidas, comentários e muito mais...</h2>
+          <p className="text-xl text-gray-600">Escolha a rede social que você deseja impulsionar</p>
         </div>
         <div className="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 justify-content-center">
           {socialNetworks.map((social) => (
@@ -71,12 +65,12 @@ const SocialNetworksSection = () => {
                   )}
                 </div>
                 <h3>{social.name}</h3>
-                <a 
+                <Link 
                   href={social.active ? `/${social.url}` : '#'} 
                   className="btn-choose"
                 >
                   COMPRAR AGORA
-                </a>
+                </Link>
               </div>
             </div>
           ))}

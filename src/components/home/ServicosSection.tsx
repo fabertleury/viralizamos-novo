@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { FaClock, FaWhatsapp, FaRocket, FaShieldAlt } from 'react-icons/fa';
 
 // Componente de Serviços
@@ -8,11 +9,6 @@ const ServicosSection = () => {
   return (
     <section className="bg-white py-16">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold mb-4">Compre Serviços de Qualidade para Instagram com Total Sigilo</h2>
-          <p className="text-lg text-gray-600 mb-4">Oferecemos seguidores brasileiros reais, curtidas, visualizações e comentários para seu perfil</p>
-        </div>
-        
         <div className="grid md:grid-cols-2 gap-8">
           <div className="bg-gray-50 p-6 rounded-lg shadow-md text-center">
             <FaClock className="mx-auto text-4xl text-blue-500 mb-4" />
@@ -48,12 +44,12 @@ const ServicosSection = () => {
         </div>
         
         <div className="text-center mt-12">
-          <a 
+          <Link 
             href="/instagram"
             className="bg-[#C43582] text-white px-8 py-3 rounded-full text-xl font-bold hover:bg-[#a62c6c] transition"
           >
             Comprar Seguidores e Curtidas
-          </a>
+          </Link>
         </div>
       </div>
     </section>
