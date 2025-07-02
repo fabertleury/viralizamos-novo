@@ -6,7 +6,6 @@ import { Header } from '@/components/layout/header';
 import { Card } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/client';
 import { Heart, Eye, Users, MessageCircle } from 'lucide-react';
-import { motion } from 'framer-motion';
 
 interface Subcategory {
   id: string;
@@ -284,21 +283,16 @@ export default function InstagramPage() {
           <div className="container mx-auto px-4">
             <div className="max-w-4xl mx-auto text-center text-white">
               <h1 className="text-4xl md:text-5xl font-bold mb-6">
-                Serviços para Instagram - Compre Seguidores, Curtidas e Visualizações
+                SERVIÇOS PARA INSTAGRAM
               </h1>
               <p className="text-xl md:text-2xl mb-8">
-                Impulsione seu perfil com seguidores brasileiros reais, curtidas e visualizações de alta qualidade. Entrega imediata!
+                Escolha o que você precisa para o seu perfil 🚀
               </p>
               <div className="flex flex-wrap justify-center gap-2 mb-8">
                 <span className="bg-white bg-opacity-20 px-3 py-1 rounded-full text-sm">#seguidoresinstagram</span>
                 <span className="bg-white bg-opacity-20 px-3 py-1 rounded-full text-sm">#curtidasreais</span>
                 <span className="bg-white bg-opacity-20 px-3 py-1 rounded-full text-sm">#visualizacoesreels</span>
                 <span className="bg-white bg-opacity-20 px-3 py-1 rounded-full text-sm">#comprarseguidoresinstagram</span>
-              </div>
-              <div className="flex justify-center">
-                <p className="text-2xl font-bold animate-pulse">
-                  🚀Mais de 10.000 perfis já foram impulsionados com sucesso!
-                </p>
               </div>
             </div>
           </div>
@@ -307,10 +301,6 @@ export default function InstagramPage() {
         {/* Categories Section */}
         <section className="py-12">
           <div className="container mx-auto px-4">
-            <h2 className="text-2xl md:text-3xl font-bold text-center mb-12">
-              Escolha o que você precisa para o seu perfil
-            </h2>
-
             {loading ? (
               <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {[...Array(4)].map((_, i) => (
