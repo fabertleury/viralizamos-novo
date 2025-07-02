@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { corsHeaders } from './lib/shared/cors';
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   // Verificar se é uma requisição OPTIONS (preflight)
   if (request.method === 'OPTIONS') {
     return new NextResponse(null, {
@@ -80,18 +80,7 @@ export function middleware(request: NextRequest) {
   // Criar cliente Supabase com configurações adicionadas
   const supabase = createMiddlewareClient({ 
     req: request, 
-    res,
-    options: {
-      // Configurações para melhorar a compatibilidade com Cloudflare
-      auth: {
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: true,
-      },
-      global: {
-        fetch: fetch, // Usar fetch padrão
-      }
-    }
+    res
   });
   
   // Tentar obter sessão de forma mais robusta
@@ -107,7 +96,7 @@ export function middleware(request: NextRequest) {
   }
 
   // Busca configuração de modo de manutenção
-  const { data: manutencaoConfig, error: configError } = await supabase
+  const { data: manutencaoConfig } = await supabase
     .from('configurations')
     .select('value')
     .eq('key', 'MODO_MANUTENCAO')
