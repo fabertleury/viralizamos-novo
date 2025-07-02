@@ -116,45 +116,48 @@ export function Header() {
           </button>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-6">
-            <Link href="/" className="text-gray-700 hover:text-primary">
-              {translations.header.home}
-            </Link>
-            
-            <Link href="/instagram" className="text-gray-700 hover:text-gray-900">
-              Serviços para Instagram
-            </Link>
-            
-            {/* FAQ Link */}
-            <Link href="/faq" className="text-gray-700 hover:text-primary">
-              FAQ
-            </Link>
-            
-            {/* Action Buttons */}
-            <Button asChild variant="ghost" className="font-medium bg-[#C43582] text-white hover:bg-[#a62c6c]">
-              <Link href="/analisar-perfil">
-                🤖 {translations.header.analyzeProfile}
+          <nav className="hidden md:flex items-center justify-between flex-1 ml-8">
+            <div className="flex items-center space-x-6">
+              <Link href="/" className="text-gray-700 hover:text-primary">
+                {translations.header.home}
               </Link>
-            </Button>
-            <Button asChild variant="ghost" className="font-medium bg-[#E91E63] text-white hover:bg-[#c2185b]">
-              <a href="https://pagamentos.viralizamos.com/acompanhar">
-                🔎 {translations.header.trackOrder}
-              </a>
-            </Button>
+              
+              <Link href="/instagram" className="text-gray-700 hover:text-gray-900">
+                Serviços para Instagram
+              </Link>
+              
+              {/* FAQ Link */}
+              <Link href="/faq" className="text-gray-700 hover:text-primary">
+                FAQ
+              </Link>
+            </div>
             
-            {/* Tickets - só aparece se logado */}
-            {isLoggedIn && (
-              <div className="relative group">
-                <Button asChild variant="ghost" className="font-medium bg-[#C43582] text-white hover:bg-[#a62c6c]">
-                  <Link href="/tickets">
-                    {translations.header.tickets}
-                  </Link>
-                </Button>
-                <div className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs animate-bounce">
-                  1
+            <div className="flex items-center space-x-4">
+              <Button asChild variant="ghost" className="font-medium bg-[#C43582] text-white hover:bg-[#a62c6c]">
+                <Link href="/analisar-perfil">
+                  🤖 {translations.header.analyzeProfile}
+                </Link>
+              </Button>
+              <Button asChild variant="ghost" className="font-medium bg-[#E91E63] text-white hover:bg-[#c2185b]">
+                <a href="https://pagamentos.viralizamos.com/acompanhar">
+                  🔎 {translations.header.trackOrder}
+                </a>
+              </Button>
+              
+              {/* Tickets - só aparece se logado */}
+              {isLoggedIn && (
+                <div className="relative group">
+                  <Button asChild variant="ghost" className="font-medium bg-[#C43582] text-white hover:bg-[#a62c6c]">
+                    <Link href="/tickets">
+                      {translations.header.tickets}
+                    </Link>
+                  </Button>
+                  <div className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs animate-bounce">
+                    1
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </nav>
 
           {/* Mobile Navigation */}
