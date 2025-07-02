@@ -6,7 +6,6 @@ import CookieConsent from '@/components/CookieConsent';
 import DepoimentosSection from '@/components/home/DepoimentosSection';
 import ServicosSection from '@/components/home/ServicosSection';
 import FAQSection from '@/components/home/FAQSection';
-import RedesSociaisSection from '@/components/home/RedesSociaisSection';
 import HomeBanner from '@/components/home/HomeBanner';
 import FloatingButtons from '@/components/home/FloatingButtons';
 import SocialNetworksSection from '@/components/home/SocialNetworksSection';
@@ -22,7 +21,6 @@ export default function HomePage() {
         <HomeBanner />
         <SocialNetworksSection />
         <ServicosSection />
-        <RedesSociaisSection />
         <DepoimentosSection />
         <FAQSection />
       </main>

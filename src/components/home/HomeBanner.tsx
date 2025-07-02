@@ -10,7 +10,6 @@ const HomeBanner = () => {
         <div className="row align-items-center">
           <div className="col-md-6 mb-4 mb-md-0">
             <div className="area-texto">
-              <h1 className="display-5 fw-bold">Compre Seguidores, Curtidas e Visualizações para Instagram</h1>
               <h3 className="mt-3">ANALISE SEU PERFIL COM NOSSA INTELIGÊNCIA ARTIFICIAL DE GRAÇA</h3>
               <h2>Descubra como melhorar seu perfil no Instagram e bombar nas redes!</h2>
               
