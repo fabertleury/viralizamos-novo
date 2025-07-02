@@ -8,6 +8,13 @@ import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 
+interface ServiceDetails {
+  global_reach: boolean;
+  fast_delivery: boolean;
+  guaranteed_security: boolean;
+  [key: string]: boolean;
+}
+
 interface Service {
   id: string;
   name: string;
@@ -21,22 +28,34 @@ interface Service {
   discount_price?: number;
   quantidade_preco: { quantidade: number; preco: number; preco_original?: number }[];
   metadata?: {
-    service_details?: {
-      global_reach?: boolean;
-      fast_delivery?: boolean;
-      guaranteed_security?: boolean;
-      [key: string]: any;
-    };
-    [key: string]: any;
+    service_details?: Partial<ServiceDetails>;
+    quantidade_preco?: { quantidade: number; preco: number; preco_original?: number }[];
+    [key: string]: unknown;
   };
   type: string;
+  isbestseller?: string;
+}
+
+interface DatabaseService {
+  id: string;
+  name: string;
+  descricao: string;
+  preco: number;
+  min_order?: number;
+  max_order?: number;
+  categoria?: string;
+  status: boolean;
+  metadata?: Record<string, unknown>;
+  service_variations?: { quantidade: number; preco: number; preco_original?: number }[];
+  checkout_type_id?: string;
+  type?: string;
   isbestseller?: string;
 }
 
 export default function CurtidasPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedServices, setSelectedServices] = useState<{[key: string]: number}>({});
+  const [selectedServices, setSelectedServices] = useState<Record<string, number>>({});
   const supabase = createClient();
 
   useEffect(() => {
@@ -73,7 +92,7 @@ export default function CurtidasPage() {
         if (error) throw error;
 
         // Transformar os dados para o formato esperado
-        const formattedServices: Service[] = (data || [])
+        const formattedServices: Service[] = (data as DatabaseService[] || [])
           .filter(service => {
             const categoria = service.categoria?.toLowerCase() || '';
             const nome = service.name?.toLowerCase() || '';
@@ -85,7 +104,7 @@ export default function CurtidasPage() {
               service.type === 'curtidas'
             );
           })
-          .map((service: any) => ({
+          .map((service) => ({
             id: service.id,
             name: service.name,
             description: service.descricao,
@@ -93,11 +112,11 @@ export default function CurtidasPage() {
             min_quantity: service.min_order || 50,
             max_quantity: service.max_order || 10000,
             slug: service.name.toLowerCase().replace(/\s+/g, '-'),
-            categoria: service.categoria,
+            categoria: service.categoria || '',
             status: service.status,
-            quantidade_preco: service.service_variations || (service.metadata?.quantidade_preco as any[]) || [],
+            quantidade_preco: service.service_variations || (service.metadata?.quantidade_preco as { quantidade: number; preco: number; preco_original?: number }[]) || [],
             metadata: service.metadata,
-            type: service.type,
+            type: service.type || '',
             isbestseller: service.isbestseller
           }));
 
@@ -216,11 +235,6 @@ export default function CurtidasPage() {
                   <p className="text-xl md:text-2xl mb-0">
                     Aumente a credibilidade do seu perfil com curtidas de alta qualidade
                   </p>
-                  <div className="mt-4">
-                    <span className="inline-block bg-white bg-opacity-20 text-white text-xs px-2 py-1 rounded mr-2 mb-2">#curtidasinstagram</span>
-                    <span className="inline-block bg-white bg-opacity-20 text-white text-xs px-2 py-1 rounded mr-2 mb-2">#comprarcurtidas</span>
-                    <span className="inline-block bg-white bg-opacity-20 text-white text-xs px-2 py-1 rounded mr-2 mb-2">#likesreais</span>
-                  </div>
                 </div>
               </div>
             </div>
