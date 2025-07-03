@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
     console.log(`Perfil bloqueado: ${usernameToCheck} - Motivo: ${blockStatus.reason}`);
     return NextResponse.json(
       { 
-        message: 'Não foi possível verificar este perfil. Verifique se o nome de usuário está correto ou tente outro perfil.', 
+        message: 'Não foi possível verificar este perfil. Verifique se o nome de usuário está correto.', 
         error_code: 'profile_unavailable',
         username: usernameToCheck
       },
