@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
-import { createClient } from '@supabase/supabase-js';
+import { Pool, QueryResult } from 'pg';
 
-// Criar cliente do Supabase
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-);
+// Configurar conexão com o PostgreSQL
+const pool = new Pool({
+  connectionString: 'postgresql://postgres:zacEqGceWerpWpBZZqttjamDOCcdhRbO@shinkansen.proxy.rlwy.net:29036/railway'
+});
 
 // Interface para a ordem das APIs
 interface ApiOrder {
@@ -16,6 +15,59 @@ interface ApiOrder {
   order: number;
   max_requests: number;
   current_requests: number;
+}
+
+// Interface para o histórico de verificação
+interface VerificationHistory {
+  id: number;
+  username: string;
+  api_name: string;
+  verified_at: string;
+}
+
+// Função para verificar se um perfil está bloqueado
+async function isProfileBlocked(username: string): Promise<{ isBlocked: boolean; reason?: string }> {
+  try {
+    // Normalizar o nome de usuário (remover @ e converter para minúsculas)
+    const normalizedUsername = username.replace('@', '').toLowerCase();
+    
+    // Verificar na tabela de perfis bloqueados
+    const result = await pool.query(
+      'SELECT * FROM instagram_blocked_profiles WHERE username = $1',
+      [normalizedUsername]
+    );
+    
+    // Se não encontrou dados, não está bloqueado
+    if (result.rows.length === 0) {
+      return { isBlocked: false };
+    }
+    
+    const data = result.rows[0];
+    
+    // Verificar se o bloqueio tem data de expiração e se já passou
+    if (data.blocked_until) {
+      const now = new Date();
+      const expirationDate = new Date(data.blocked_until);
+      
+      if (now > expirationDate) {
+        // O bloqueio expirou, remover da lista
+        await pool.query(
+          'DELETE FROM instagram_blocked_profiles WHERE username = $1',
+          [normalizedUsername]
+        );
+        return { isBlocked: false };
+      }
+    }
+    
+    // Perfil está bloqueado
+    return { 
+      isBlocked: true, 
+      reason: data.reason || 'Perfil bloqueado pelo sistema'
+    };
+  } catch (error) {
+    console.error('Erro ao verificar bloqueio de perfil:', error);
+    return { isBlocked: false };
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -46,8 +98,22 @@ export async function GET(request: NextRequest) {
 
   // Remover @ se presente
   usernameToCheck = usernameToCheck.replace('@', '');
+  
+  // Verificar se o perfil está bloqueado
+  const blockStatus = await isProfileBlocked(usernameToCheck);
+  if (blockStatus.isBlocked) {
+    console.log(`Perfil bloqueado: ${usernameToCheck} - Motivo: ${blockStatus.reason}`);
+    return NextResponse.json(
+      { 
+        message: 'Este perfil está bloqueado e não pode ser verificado', 
+        reason: blockStatus.reason,
+        username: usernameToCheck
+      },
+      { status: 403 }
+    );
+  }
 
-  // Obter a ordem das APIs do Supabase
+  // Obter a ordem das APIs do banco de dados
   let apiOrder: ApiOrder[] = [
     { id: 1, name: 'rocketapi_get_info', enabled: true, order: 1, max_requests: 100, current_requests: 0 },
     { id: 2, name: 'instagram_scraper', enabled: true, order: 2, max_requests: 50, current_requests: 0 },
@@ -59,33 +125,35 @@ export async function GET(request: NextRequest) {
 
   try {
     // Tentar obter a ordem das APIs do banco de dados
-    const { data, error } = await supabase
-      .from('api_order')
-      .select('*')
-      .order('order', { ascending: true });
+    const result = await pool.query(
+      'SELECT * FROM api_order ORDER BY "order" ASC'
+    );
 
-    if (error) {
-      console.error('Erro ao obter ordem das APIs:', error);
-    } else if (data && data.length > 0) {
-      apiOrder = data;
+    if (result.rows.length > 0) {
+      apiOrder = result.rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        enabled: row.enabled,
+        order: row.order,
+        max_requests: row.max_requests,
+        current_requests: row.current_requests
+      }));
     }
   } catch (error) {
-    console.error('Erro ao acessar o Supabase:', error);
+    console.error('Erro ao acessar o PostgreSQL:', error);
   }
 
   // Se for uma verificação rápida, verificar se já temos esse perfil em cache
   if (quickCheck) {
     try {
       // Tentar buscar o perfil mais recente do banco de dados
-      const { data, error } = await supabase
-        .from('instagram_verification_history')
-        .select('*')
-        .eq('username', username)
-        .order('verified_at', { ascending: false })
-        .limit(1);
+      const result = await pool.query(
+        'SELECT * FROM instagram_verification_history WHERE username = $1 ORDER BY verified_at DESC LIMIT 1',
+        [username]
+      );
 
-      if (!error && data && data.length > 0) {
-        const lastCheck = data[0];
+      if (result.rows.length > 0) {
+        const lastCheck = result.rows[0];
         const lastApiName = lastCheck.api_name;
         
         console.log(`Última API usada para ${username}: ${lastApiName}`);
@@ -142,15 +210,13 @@ export async function GET(request: NextRequest) {
   // Obter a última API usada para este usuário
   let lastUsedApi = null;
   try {
-    const { data, error } = await supabase
-      .from('instagram_verification_history')
-      .select('api_name')
-      .eq('username', username)
-      .order('verified_at', { ascending: false })
-      .limit(1);
+    const result = await pool.query(
+      'SELECT api_name FROM instagram_verification_history WHERE username = $1 ORDER BY verified_at DESC LIMIT 1',
+      [username]
+    );
 
-    if (!error && data && data.length > 0) {
-      lastUsedApi = data[0].api_name;
+    if (result.rows.length > 0) {
+      lastUsedApi = result.rows[0].api_name;
       console.log(`Última API usada para ${username}: ${lastUsedApi}`);
     }
   } catch (error) {
@@ -179,14 +245,10 @@ export async function GET(request: NextRequest) {
     try {
       const apiToUpdate = apiOrder.find(api => api.name === apiName);
       if (apiToUpdate) {
-        const { error } = await supabase
-          .from('api_order')
-          .update({ current_requests: apiToUpdate.current_requests + 1 })
-          .eq('id', apiToUpdate.id);
-
-        if (error) {
-          console.error(`Erro ao atualizar contador para ${apiName}:`, error);
-        }
+        await pool.query(
+          'UPDATE api_order SET current_requests = current_requests + 1 WHERE id = $1',
+          [apiToUpdate.id]
+        );
       }
     } catch (error) {
       console.error(`Erro ao atualizar contador para ${apiName}:`, error);
@@ -197,25 +259,18 @@ export async function GET(request: NextRequest) {
   const updateVerificationHistory = async (apiName: string) => {
     try {
       // Primeiro, excluir qualquer registro existente para este usuário e API
-      await supabase
-        .from('instagram_verification_history')
-        .delete()
-        .match({ username, api_name: apiName });
+      await pool.query(
+        'DELETE FROM instagram_verification_history WHERE username = $1 AND api_name = $2',
+        [username, apiName]
+      );
 
       // Inserir o novo registro
-      const { error } = await supabase
-        .from('instagram_verification_history')
-        .insert({
-          username,
-          api_name: apiName,
-          verified_at: new Date().toISOString()
-        });
-
-      if (error) {
-        console.error(`Erro ao atualizar histórico para ${apiName}:`, error);
-      }
+      await pool.query(
+        'INSERT INTO instagram_verification_history (username, api_name, verified_at) VALUES ($1, $2, $3)',
+        [username, apiName, new Date().toISOString()]
+      );
     } catch (error) {
-      console.error(`Erro ao atualizar histórico para ${apiName}:`, error);
+      console.error(`Erro ao registrar verificação para ${apiName}:`, error);
     }
   };
 
