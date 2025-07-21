@@ -294,7 +294,7 @@ export class TransactionProcessor {
           serviceType: service.type,
           providerId: provider.id,
           posts,
-          quantity: service.quantity || 100, // Quantidade padrão se não especificada
+          quantity: service.quantity || service.quantidade || 1, // Suporte para ambas nomenclaturas
           providerKey: provider.api_key,
           providerApiUrl: provider.api_url,
           externalServiceId: service.external_id
